@@ -28,14 +28,15 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!hasMounted) return;
     if (typeof window !== 'undefined') {
-      setUserCode(localStorage.getItem('user_code') || '');
-      setBusinessId(localStorage.getItem('businessId') || '');
+      // Always use businessInfo from localStorage for consistency
       let parsed: any = null;
       try {
         const saved = localStorage.getItem('businessInfo');
         if (saved) parsed = JSON.parse(saved);
       } catch {}
       setBusinessName(parsed?.businessName || 'Business User');
+      setBusinessId(parsed?.businessId || '');
+      setUserCode(localStorage.getItem('user_code') || parsed?.businessId || '');
       // Load recent receipts from localStorage
       const bizId = parsed?.businessId || '';
       if (bizId) {

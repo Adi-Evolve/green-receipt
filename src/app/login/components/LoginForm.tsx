@@ -57,11 +57,15 @@ const LoginForm = () => {
       // Simulate authentication API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       // Simulate fetching user info from backend
-      const userInfo = {
-        email: formData.email,
-        businessId: '123456', // You should fetch this from backend in real app
-        businessName: 'Business User', // Fetch from backend
-      };
+      let userInfo: any = null;
+      const user_code = localStorage.getItem('user_code');
+      const businessInfoRaw = localStorage.getItem('businessInfo');
+      if (businessInfoRaw) {
+        userInfo = JSON.parse(businessInfoRaw);
+      } else {
+        userInfo = { email: formData.email, businessId: user_code || '', businessName: '' };
+      }
+      // Use consistent business info
       localStorage.setItem('userEmail', formData.email);
       if (formData.rememberMe) {
         localStorage.setItem('user', JSON.stringify(userInfo));
