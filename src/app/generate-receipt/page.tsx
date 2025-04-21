@@ -120,7 +120,7 @@ export default function GenerateReceiptPage() {
     if (savedBiz) {
       try {
         bizInfo = JSON.parse(savedBiz);
-        bizId = bizInfo.businessId || bizInfo.user_code || '';
+        bizId = bizInfo.businessId || (bizInfo as any).user_code || '';
       } catch {}
     }
     setBusinessInfo(bizInfo);
@@ -192,7 +192,7 @@ export default function GenerateReceiptPage() {
     return null;
   }
 
-  if (!businessInfo || (!businessInfo.businessId && !businessInfo.user_code)) {
+  if (!businessInfo || (!businessInfo.businessId && !(businessInfo as any).user_code)) {
     return (
       <main className="min-h-screen flex flex-col bg-gray-50">
         <ServerNavbar isLoggedIn={true} />
@@ -217,7 +217,7 @@ export default function GenerateReceiptPage() {
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
     setQrValue(JSON.stringify({
       receiptNumber,
-      businessId: businessInfo.businessId,
+      businessId: businessInfo.businessId || (businessInfo as any).user_code,
       businessName: businessInfo.name,
       customerId,
       products,
@@ -365,6 +365,11 @@ export default function GenerateReceiptPage() {
     e.preventDefault();
     setSaving(true);
     setSaveError(null);
+    if (!format || !businessInfo) {
+      setSaveError('Required business or format info missing. Please reload the page.');
+      setSaving(false);
+      return;
+    }
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
     // Generate a unique code for this receipt (for QR and DB lookup)
     const bizId = businessInfo.businessId || (businessInfo as any).user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
@@ -406,10 +411,14 @@ export default function GenerateReceiptPage() {
   }
 
   function handleSaveDraft() {
+    if (!format || !businessInfo) {
+      setSaveError('Required business or format info missing. Please reload the page.');
+      return;
+    }
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
-    const draftUniqueId = `${businessInfo.businessId}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const draftUniqueId = `${businessInfo.businessId || (businessInfo as any).user_code}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const draftData = {
-      businessId: businessInfo.businessId,
+      businessId: businessInfo.businessId || (businessInfo as any).user_code,
       receiptNumber,
       customerId,
       products,
@@ -425,22 +434,17 @@ export default function GenerateReceiptPage() {
       draftId: draftUniqueId,
     };
     try {
-      const allDraftsKey = `drafts_${businessInfo.businessId}`;
+      const allDraftsKey = `drafts_${businessInfo.businessId || (businessInfo as any).user_code}`;
       let allDrafts = [];
       const existing = localStorage.getItem(allDraftsKey);
       if (existing) {
-        try { allDrafts = JSON.parse(existing); } catch { allDrafts = []; }
+        allDrafts = JSON.parse(existing);
       }
       allDrafts.push(draftData);
       localStorage.setItem(allDraftsKey, JSON.stringify(allDrafts));
       setSaveSuccess(true);
-      setProducts([{ id: '1', name: '', price: 0, quantity: 1, gst: 0, amount: 0 }]);
-      setCustomerId('');
-      setSelectedCustomer(null);
-      setSaveError(null);
-      alert('Receipt saved as draft!');
-    } catch (err) {
-      setSaveError('Failed to save draft.');
+    } catch (err: unknown) {
+      setSaveError('Error saving draft: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   }
 
@@ -587,7 +591,7 @@ export default function GenerateReceiptPage() {
                 <div className="text-xs text-gray-500 mt-2">Scan to view receipt details</div>
               </div>
             )}
-            {businessInfo.terms && (
+            {businessInfo?.terms && (
               <div className="bg-gray-100 rounded p-3 mt-4 text-xs text-gray-700">
                 <strong>Terms & Conditions:</strong> {businessInfo.terms}
               </div>
