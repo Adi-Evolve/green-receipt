@@ -86,6 +86,7 @@ const defaultBusinessInfo: BusinessInfo = {
 };
 
 export default function GenerateReceiptPage() {
+  const [hasMounted, setHasMounted] = useState(false);
   const [format, setFormat] = useState<ReceiptFormat>(defaultFormat);
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(defaultBusinessInfo);
   const [products, setProducts] = useState<Product[]>([{
@@ -109,6 +110,11 @@ export default function GenerateReceiptPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
     // Load all formats for the business user from localStorage
     let bizId = '';
     const savedBiz = localStorage.getItem('businessInfo');
@@ -116,7 +122,6 @@ export default function GenerateReceiptPage() {
     if (savedBiz) {
       try {
         info = JSON.parse(savedBiz);
-        // Patch type: allow user_code as an extra property for runtime only
         bizId = (info as any).businessId || (info as any).user_code || '';
         setBusinessInfo(info);
         localStorage.setItem('businessId', bizId);
@@ -190,7 +195,7 @@ export default function GenerateReceiptPage() {
         }
       }, [businessInfo.businessId]);
     }
-  }, []);
+  }, [hasMounted]);
 
   useEffect(() => {
     // Update QR value whenever receipt changes
@@ -253,26 +258,27 @@ export default function GenerateReceiptPage() {
     }
   }, []);
 
+  if (!hasMounted) {
+    // Prevent SSR/SSG hydration mismatch by not rendering anything until mounted
+    return null;
+  }
+
   // Defensive: Don't render until businessInfo is loaded and valid
   if (!businessInfo.businessId && !(businessInfo as any).user_code) {
-    if (typeof window !== 'undefined') {
-      return (
-        <main className="min-h-screen flex flex-col bg-gray-50">
-          <ServerNavbar isLoggedIn={true} />
-          <div className="max-w-2xl mx-auto w-full p-8 text-center">
-            <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
-            <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
-            <button onClick={() => {
-              localStorage.clear();
-              window.location.href = '/login';
-            }} className="btn btn-primary">Log in again</button>
-          </div>
-          <Footer />
-        </main>
-      );
-    } else {
-      return null;
-    }
+    return (
+      <main className="min-h-screen flex flex-col bg-gray-50">
+        <ServerNavbar isLoggedIn={true} />
+        <div className="max-w-2xl mx-auto w-full p-8 text-center">
+          <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
+          <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
+          <button onClick={() => {
+            localStorage.clear();
+            window.location.href = '/login';
+          }} className="btn btn-primary">Log in again</button>
+        </div>
+        <Footer />
+      </main>
+    );
   }
 
   // Handle customer input (ID only, numeric)
