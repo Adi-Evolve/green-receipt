@@ -116,7 +116,8 @@ export default function GenerateReceiptPage() {
     if (savedBiz) {
       try {
         info = JSON.parse(savedBiz);
-        bizId = info.businessId || info.user_code || '';
+        // Patch type: allow user_code as an extra property for runtime only
+        bizId = (info as any).businessId || (info as any).user_code || '';
         setBusinessInfo(info);
         localStorage.setItem('businessId', bizId);
       } catch {
@@ -346,7 +347,7 @@ export default function GenerateReceiptPage() {
     setSaveError(null);
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
     // Generate a unique code for this receipt (for QR and DB lookup)
-    const bizId = businessInfo.businessId || businessInfo.user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
+    const bizId = businessInfo.businessId || (businessInfo as any).user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
     if (!bizId) {
       setSaveError('Business ID missing. Please reload the page or log in again.');
       setSaving(false);
