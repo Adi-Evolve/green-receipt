@@ -71,7 +71,7 @@ export default function SettingsPage() {
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem('theme', theme);
       localStorage.setItem('colorTheme', color);
       alert('Settings saved!');
@@ -80,7 +80,7 @@ export default function SettingsPage() {
   }
 
   function saveSettings() {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem('receipt_template', template);
       localStorage.setItem('business_name', businessName);
       localStorage.setItem('webhook_url', webhookUrl);

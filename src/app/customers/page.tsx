@@ -25,13 +25,13 @@ export default function CustomersPage() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [userCode, setUserCode] = useState('');
   const [businessId, setBusinessId] = useState('');
-  const role = getUserRole();
+  const role = typeof window !== 'undefined' ? getUserRole() : undefined;
 
   useEffect(() => { setHasMounted(true); }, []);
 
   useEffect(() => {
     if (!hasMounted) return;
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window.localStorage) {
       setUserCode(localStorage.getItem('user_code') || '');
       setBusinessId(localStorage.getItem('businessId') || '');
     }
@@ -42,14 +42,14 @@ export default function CustomersPage() {
     supabase.from('customers').select('*').eq('user_code', userCode).then(({ data }) => {
       if (data) {
         setCustomers(data);
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && window.localStorage) {
           localStorage.setItem('customers_' + userCode, JSON.stringify(data));
         }
       }
     });
   }, [userCode]);
 
-  if (!hasMounted) return (
+  if (!hasMounted || typeof window === 'undefined') return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div>
       <span className="ml-4 text-lg">Loading...</span>
@@ -61,8 +61,10 @@ export default function CustomersPage() {
   }
 
   function handleExport() {
-    exportToCSV(customers, 'customers.csv');
-    showToast('Exported to CSV', 'success');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      exportToCSV(customers, 'customers.csv');
+      showToast('Exported to CSV', 'success');
+    }
   }
 
   async function handleSync() {
@@ -123,7 +125,9 @@ export default function CustomersPage() {
           await addCustomer(c);
         }
         setImporting(false);
-        fileInput.current!.value = '';
+        if (typeof window !== 'undefined' && window.localStorage) {
+          fileInput.current!.value = '';
+        }
         // Refresh customers from Supabase
         const { data } = await supabase.from('customers').select('*').eq('user_code', userCode);
         if (data) setCustomers(data);
