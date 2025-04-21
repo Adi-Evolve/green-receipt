@@ -30,11 +30,12 @@ export default function CustomersPage() {
   useEffect(() => { setHasMounted(true); }, []);
 
   useEffect(() => {
+    if (!hasMounted) return;
     if (typeof window !== 'undefined') {
       setUserCode(localStorage.getItem('user_code') || '');
       setBusinessId(localStorage.getItem('businessId') || '');
     }
-  }, []);
+  }, [hasMounted]);
 
   useEffect(() => {
     if (!userCode) return;

@@ -43,6 +43,7 @@ export default function SettingsPage() {
   useEffect(() => { setHasMounted(true); }, []);
 
   useEffect(() => {
+    if (!hasMounted) return;
     if (typeof window !== 'undefined') {
       const savedTemplate = localStorage.getItem('receipt_template');
       if (savedTemplate) setTemplate(savedTemplate);
@@ -59,7 +60,7 @@ export default function SettingsPage() {
       const savedColor = localStorage.getItem('colorTheme');
       if (savedColor) setColor(savedColor);
     }
-  }, []);
+  }, [hasMounted]);
 
   if (!hasMounted) return (
     <div className="flex items-center justify-center min-h-screen">
