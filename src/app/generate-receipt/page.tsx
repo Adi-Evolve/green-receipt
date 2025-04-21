@@ -253,6 +253,28 @@ export default function GenerateReceiptPage() {
     }
   }, []);
 
+  // Defensive: Don't render until businessInfo is loaded and valid
+  if (!businessInfo.businessId && !(businessInfo as any).user_code) {
+    if (typeof window !== 'undefined') {
+      return (
+        <main className="min-h-screen flex flex-col bg-gray-50">
+          <ServerNavbar isLoggedIn={true} />
+          <div className="max-w-2xl mx-auto w-full p-8 text-center">
+            <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
+            <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
+            <button onClick={() => {
+              localStorage.clear();
+              window.location.href = '/login';
+            }} className="btn btn-primary">Log in again</button>
+          </div>
+          <Footer />
+        </main>
+      );
+    } else {
+      return null;
+    }
+  }
+
   // Handle customer input (ID only, numeric)
   const handleCustomerIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
