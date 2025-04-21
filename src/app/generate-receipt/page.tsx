@@ -112,11 +112,16 @@ export default function GenerateReceiptPage() {
     // Load all formats for the business user from localStorage
     let bizId = '';
     const savedBiz = localStorage.getItem('businessInfo');
+    let info = null;
     if (savedBiz) {
-      const info = JSON.parse(savedBiz);
-      bizId = info.businessId;
-      setBusinessInfo(info);
-      localStorage.setItem('businessId', info.businessId);
+      try {
+        info = JSON.parse(savedBiz);
+        bizId = info.businessId || info.user_code || '';
+        setBusinessInfo(info);
+        localStorage.setItem('businessId', bizId);
+      } catch {
+        bizId = localStorage.getItem('businessId') || '';
+      }
     } else {
       bizId = localStorage.getItem('businessId') || '';
     }
@@ -341,9 +346,15 @@ export default function GenerateReceiptPage() {
     setSaveError(null);
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
     // Generate a unique code for this receipt (for QR and DB lookup)
-    const receiptUniqueId = `${businessInfo.businessId}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const bizId = businessInfo.businessId || businessInfo.user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
+    if (!bizId) {
+      setSaveError('Business ID missing. Please reload the page or log in again.');
+      setSaving(false);
+      return;
+    }
+    const receiptUniqueId = `${bizId}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const receiptData = {
-      user_code: businessInfo.businessId,
+      user_code: bizId,
       receipt_number: receiptNumber,
       customer_id: customerId,
       products: JSON.stringify(products),
