@@ -87,11 +87,9 @@ const defaultBusinessInfo: BusinessInfo = {
 
 export default function GenerateReceiptPage() {
   const [hasMounted, setHasMounted] = useState(false);
-  const [format, setFormat] = useState<ReceiptFormat>(defaultFormat);
-  const [businessInfo, setBusinessInfo] = useState<BusinessInfo>(defaultBusinessInfo);
-  const [products, setProducts] = useState<Product[]>([{
-    id: '1', name: '', price: 0, quantity: 1, gst: 0, amount: 0
-  }]);
+  const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
+  const [format, setFormat] = useState<ReceiptFormat | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [customerId, setCustomerId] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
   const [date, setDate] = useState('');
@@ -115,87 +113,104 @@ export default function GenerateReceiptPage() {
 
   useEffect(() => {
     if (!hasMounted) return;
-    // Load all formats for the business user from localStorage
+    // Only run on client
+    let bizInfo: any = null;
     let bizId = '';
     const savedBiz = localStorage.getItem('businessInfo');
-    let info = null;
     if (savedBiz) {
       try {
-        info = JSON.parse(savedBiz);
-        bizId = (info as any).businessId || (info as any).user_code || '';
-        setBusinessInfo(info);
-        localStorage.setItem('businessId', bizId);
-      } catch {
-        bizId = localStorage.getItem('businessId') || '';
-      }
-    } else {
-      bizId = localStorage.getItem('businessId') || '';
-    }
-    // Fetch all formats for dropdown
-    let all = [];
-    try {
-      // Correct: get from billDesigns_{bizId}
-      const arr = JSON.parse(localStorage.getItem(`billDesigns_${bizId}`) || '[]');
-      if (Array.isArray(arr)) all = arr;
-    } catch {
-      all = [];
-    }
-    setAllFormats(all);
-    // Default: pick first format if exists
-    if (all.length > 0) {
-      setFormat(all[0].designData);
-      setSelectedFormatName(all[0].name);
-    }
-    // Load format from localStorage (optional, fallback)
-    const savedFormat = localStorage.getItem('receiptFormat');
-    if (savedFormat) setFormat(JSON.parse(savedFormat));
-    // Load customers/products as before
-    // RECEIPT NUMBER FORMAT: GR-<business id>-<serial no>
-    let serial = 1;
-    let prev = localStorage.getItem(`receipts_${bizId}`);
-    if (prev) {
-      try {
-        const arr = JSON.parse(prev);
-        if (Array.isArray(arr) && arr.length > 0) {
-          // Find highest serial for this bizId
-          const serials = arr.map((r:any) => {
-            const match = (r.receiptNumber||'').match(/^GR-([^-]+)-(\d+)$/);
-            return match && match[1] === bizId && match[2] ? parseInt(match[2], 10) : 0;
-          });
-          serial = Math.max(...serials, 0) + 1;
-        }
+        bizInfo = JSON.parse(savedBiz);
+        bizId = bizInfo.businessId || bizInfo.user_code || '';
       } catch {}
     }
-    setReceiptNumber(`GR-${bizId}-${serial}`);
-    setDate(new Date().toISOString().split('T')[0]);
+    setBusinessInfo(bizInfo);
+    // Set default format, products, etc only if business info is present
     if (bizId) {
-      // Fetch customers from Supabase, not localStorage/API
+      // Receipt format
+      let all = [];
+      try {
+        const arr = JSON.parse(localStorage.getItem(`billDesigns_${bizId}`) || '[]');
+        if (Array.isArray(arr)) all = arr;
+      } catch {
+        all = [];
+      }
+      setAllFormats(all);
+      if (all.length > 0) {
+        setFormat(all[0].designData);
+        setSelectedFormatName(all[0].name);
+      }
+      // Default format fallback
+      if (all.length === 0) {
+        setFormat({
+          columns: { product: true, quantity: true, gst: true, price: true, amount: true },
+          elements: { logo: true, businessInfo: true, customerInfo: true, termsAndConditions: false, warranty: true, qrCode: true },
+        });
+      }
+      // Products
+      setProducts([{ id: '1', name: '', price: 0, quantity: 1, gst: 0, amount: 0 }]);
+      // Receipt number
+      let serial = 1;
+      let prev = localStorage.getItem(`receipts_${bizId}`);
+      if (prev) {
+        try {
+          const arr = JSON.parse(prev);
+          if (Array.isArray(arr) && arr.length > 0) {
+            const serials = arr.map((r:any) => {
+              const match = (r.receiptNumber||'').match(/^GR-([^-]+)-(\d+)$/);
+              return match && match[1] === bizId && match[2] ? parseInt(match[2], 10) : 0;
+            });
+            serial = Math.max(...serials, 0) + 1;
+          }
+        } catch {}
+      }
+      setReceiptNumber(`GR-${bizId}-${serial}`);
+      setDate(new Date().toISOString().split('T')[0]);
+      // Customers
       (async () => {
-        if (!businessInfo.businessId) return;
-        const { data } = await supabase.from('customers').select('*').eq('user_code', businessInfo.businessId);
+        const { data } = await supabase.from('customers').select('*').eq('user_code', bizId);
         if (data) setCustomers(data);
       })();
-      // Load products: Try localStorage first, fallback to Supabase
-      useEffect(() => {
-        let loaded = false;
-        if (businessInfo.businessId) {
-          try {
-            const local = localStorage.getItem(`products_${businessInfo.businessId}`);
-            if (local) {
-              setProductsList(JSON.parse(local));
-              loaded = true;
-            }
-          } catch {}
-          if (!loaded) {
-            (async () => {
-              const { data } = await supabase.from('products').select('*').eq('user_code', businessInfo.businessId);
-              if (data) setProductsList(data);
-            })();
-          }
+      // Products list
+      let loaded = false;
+      try {
+        const local = localStorage.getItem(`products_${bizId}`);
+        if (local) {
+          setProductsList(JSON.parse(local));
+          loaded = true;
         }
-      }, [businessInfo.businessId]);
+      } catch {}
+      if (!loaded) {
+        (async () => {
+          const { data } = await supabase.from('products').select('*').eq('user_code', bizId);
+          if (data) setProductsList(data);
+        })();
+      }
     }
   }, [hasMounted]);
+
+  if (!hasMounted) {
+    return null;
+  }
+
+  if (!businessInfo || (!businessInfo.businessId && !businessInfo.user_code)) {
+    return (
+      <main className="min-h-screen flex flex-col bg-gray-50">
+        <ServerNavbar isLoggedIn={true} />
+        <div className="max-w-2xl mx-auto w-full p-8 text-center">
+          <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
+          <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
+          <button onClick={() => {
+            localStorage.clear();
+            window.location.href = '/login';
+          }} className="btn btn-primary">Log in again</button>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
+  if (!format) return null;
+  if (!businessInfo) return null;
 
   useEffect(() => {
     // Update QR value whenever receipt changes
@@ -257,29 +272,6 @@ export default function GenerateReceiptPage() {
       }
     }
   }, []);
-
-  if (!hasMounted) {
-    // Prevent SSR/SSG hydration mismatch by not rendering anything until mounted
-    return null;
-  }
-
-  // Defensive: Don't render until businessInfo is loaded and valid
-  if (!businessInfo.businessId && !(businessInfo as any).user_code) {
-    return (
-      <main className="min-h-screen flex flex-col bg-gray-50">
-        <ServerNavbar isLoggedIn={true} />
-        <div className="max-w-2xl mx-auto w-full p-8 text-center">
-          <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
-          <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
-          <button onClick={() => {
-            localStorage.clear();
-            window.location.href = '/login';
-          }} className="btn btn-primary">Log in again</button>
-        </div>
-        <Footer />
-      </main>
-    );
-  }
 
   // Handle customer input (ID only, numeric)
   const handleCustomerIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
