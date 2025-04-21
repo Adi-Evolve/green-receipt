@@ -1,0 +1,136 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import Head from "next/head";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import ReceiptView from "./ReceiptView";
+
+export default function ViewReceiptPage() {
+  const { id } = useParams();
+  const [receipt, setReceipt] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Try to fetch from backend
+    fetch("http://localhost:3000/api/receipts")
+      .then((res) => res.json())
+      .then((data) => {
+        const found = Array.isArray(data)
+          ? data.find(
+              (r) => r.qrCode === id || r.receiptUniqueId === id || r._id === id
+            )
+          : null;
+        if (found) {
+          // Patch businessInfo with profile info if missing/incorrect
+          let businessInfo = found.businessInfo || {};
+          if (typeof window !== "undefined") {
+            const profile = localStorage.getItem("businessInfo");
+            if (profile) {
+              try {
+                const parsed = JSON.parse(profile);
+                // Only override name/id if missing or placeholder
+                if (!businessInfo.name || businessInfo.name === "Business Name") businessInfo.name = parsed.businessName || parsed.name;
+                if (!businessInfo.businessId) businessInfo.businessId = parsed.businessId;
+              } catch {}
+            }
+          }
+          setReceipt({ ...found, businessInfo });
+        } else setError("Receipt not found");
+      })
+      .catch(() => setError("Failed to fetch receipt"));
+  }, [id]);
+
+  function handleDownloadPDF() {
+    if (!receipt) return;
+    const doc = new jsPDF();
+    // @ts-ignore
+    if (typeof doc.autoTable !== "function") {
+      alert("PDF table export is not available. Please ensure jspdf-autotable is installed.");
+      return;
+    }
+    const format = receipt.format || {};
+    const columnOrder = format.columns ? Object.keys(format.columns).filter(k => format.columns[k]) : ["product", "quantity", "price", "amount"];
+    const columnLabels: Record<string, string> = {
+      serial: "Serial",
+      product: "Product",
+      quantity: "Quantity",
+      gst: "GST",
+      price: "Price",
+      amount: "Amount",
+      discount: "Discount"
+    };
+    doc.setFont(format.font || "Arial");
+    doc.setTextColor(format.color || "#000000");
+    doc.text(receipt.businessInfo?.name || "Business Name", 14, 15);
+    doc.text(receipt.businessInfo?.address || "", 14, 22);
+    doc.text(receipt.businessInfo?.phone || "", 14, 29);
+    doc.text(receipt.businessInfo?.email || "", 14, 36);
+    doc.text("Receipt No: " + (receipt.receiptNumber || receipt.id), 150, 15);
+    doc.text("Date: " + receipt.date, 150, 22);
+    const columns = columnOrder.map((col: keyof typeof columnLabels) => columnLabels[col] || col);
+    const dataRows = (receipt.products || []).map((p: any, idx: number) => {
+      return columnOrder.map((col: keyof typeof columnLabels) => {
+        if (col === "serial") return idx + 1;
+        if (col === "product") return p.name;
+        if (col === "quantity") return p.quantity;
+        if (col === "gst") return p.gst;
+        if (col === "price") return p.price;
+        if (col === "amount") return (p.price * p.quantity * (format.columns?.gst ? (1 + (p.gst || 0)/100) : 1)).toFixed(2);
+        if (col === "discount") return p.discount || 0;
+        return "";
+      });
+    });
+    // @ts-ignore
+    doc.autoTable({
+      head: [columns],
+      body: dataRows,
+      startY: 45,
+      theme: format.showGrid ? "grid" : "plain",
+      styles: { font: format.font || "Arial", textColor: format.color || "#000000" },
+      tableLineWidth: format.showBorder ? 0.1 : 0,
+    });
+    let y = 55;
+    // @ts-ignore
+    if (doc.lastAutoTable && typeof doc.lastAutoTable.finalY === "number") {
+      // @ts-ignore
+      y = doc.lastAutoTable.finalY + 10;
+    }
+    if (format.elements?.termsAndConditions && receipt.terms) {
+      doc.text("Terms: " + receipt.terms, 14, y);
+      y += 7;
+    }
+    if (format.elements?.notes && receipt.notes) {
+      doc.text("Notes: " + receipt.notes, 14, y);
+      y += 7;
+    }
+    if (format.elements?.signature) {
+      doc.text("Signature: ___________________", 14, y);
+      y += 7;
+    }
+    doc.save(`receipt_${receipt.receiptNumber || id}.pdf`);
+  }
+
+  if (error) return <div className="p-8 text-red-600">{error}</div>;
+  if (!receipt) return <div className="p-8">Loading...</div>;
+
+  // Try to get logoUrl from receipt, businessInfo, or localStorage
+  let logoUrl = receipt.businessInfo?.logoUrl || "";
+  if (!logoUrl && typeof window !== "undefined") {
+    logoUrl = localStorage.getItem("logoUrl") || "";
+  }
+
+  return (
+    <>
+      <Head>
+        <title>Receipt #{receipt.receiptNumber} | Green Receipt</title>
+        {logoUrl && <link rel="icon" href={logoUrl} />}
+      </Head>
+      <div className="p-8">
+        <ReceiptView receipt={{ ...receipt, logoUrl }} />
+        <button className="btn-primary mt-4" onClick={handleDownloadPDF}>Download PDF</button>
+      </div>
+    </>
+  );
+}
