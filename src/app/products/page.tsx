@@ -32,8 +32,14 @@ export default function ProductsPage() {
   useEffect(() => {
     if (!hasMounted) return;
     if (typeof window !== 'undefined') {
-      setUserCode(localStorage.getItem('user_code') || '');
-      setBusinessId(localStorage.getItem('businessId') || '');
+      // Always use businessInfo from localStorage for consistency
+      let parsed: any = null;
+      try {
+        const saved = localStorage.getItem('businessInfo');
+        if (saved) parsed = JSON.parse(saved);
+      } catch {}
+      setUserCode(localStorage.getItem('user_code') || parsed?.businessId || '');
+      setBusinessId(parsed?.businessId || '');
     }
   }, [hasMounted]);
 
@@ -78,9 +84,14 @@ export default function ProductsPage() {
   }
 
   async function addProduct(newProduct: any) {
-    if (!userCode) return;
-    await addEntity('products', newProduct, setProducts);
-    logAudit('add', 'products', newProduct, userCode);
+    if (!userCode) {
+      showToast('User code missing. Please reload the page.', 'error');
+      return;
+    }
+    // Always set user_code on product before saving
+    const productToSave = { ...newProduct, user_code: userCode };
+    await addEntity('products', productToSave, setProducts);
+    logAudit('add', 'products', productToSave, userCode);
     showToast('Product added', 'success');
   }
 
