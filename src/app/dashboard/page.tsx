@@ -21,11 +21,12 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any>({});
   const [recent, setRecent] = useState<any[]>([]);
   const [userCode, setUserCode] = useState('');
-  const role = getUserRole();
+  const role = typeof window !== 'undefined' ? getUserRole() : undefined;
 
   useEffect(() => { setHasMounted(true); }, []);
 
   useEffect(() => {
+    if (!hasMounted) return;
     if (typeof window !== 'undefined') {
       setUserCode(localStorage.getItem('user_code') || '');
       setBusinessId(localStorage.getItem('businessId') || '');
@@ -59,7 +60,7 @@ export default function DashboardPage() {
         setRecentReceipts(receiptsArr.slice(0, 5));
       }
     }
-  }, []);
+  }, [hasMounted]);
 
   useEffect(() => {
     if (!userCode) return;
@@ -80,7 +81,7 @@ export default function DashboardPage() {
     fetchStats();
   }, [userCode]);
 
-  if (!hasMounted) return (
+  if (!hasMounted || typeof window === 'undefined') return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div>
       <span className="ml-4 text-lg">Loading...</span>
