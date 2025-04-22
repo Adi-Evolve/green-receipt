@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const [recentReceipts, setRecentReceipts] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [userCode, setUserCode] = useState('');
+  const [customers, setCustomers] = useState<Record<string, string>>({});
 
   useEffect(() => { setHasMounted(true); }, []);
 
@@ -79,6 +80,32 @@ export default function DashboardPage() {
     }
     fetchStats();
   }, [userCode]);
+
+  useEffect(() => {
+    async function fetchCustomers() {
+      const businessId = localStorage.getItem('businessId');
+      if (!businessId) return;
+      let customersMap: Record<string, string> = {};
+      let local = localStorage.getItem('customers_' + businessId);
+      if (local) {
+        try {
+          const arr = JSON.parse(local);
+          arr.forEach((c: any) => {
+            customersMap[c.customerId || c.id || c.name] = c.name;
+          });
+        } catch {}
+      }
+      // Fetch from Supabase as fallback
+      const { data } = await supabase.from('customers').select('*').eq('user_code', businessId);
+      if (data) {
+        data.forEach((c: any) => {
+          customersMap[c.customerId || c.id || c.name] = c.name;
+        });
+      }
+      setCustomers(customersMap);
+    }
+    fetchCustomers();
+  }, [recentReceipts]);
 
   if (!hasMounted || typeof window === 'undefined') return (
     <div className="flex items-center justify-center min-h-screen">
@@ -160,8 +187,8 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt #</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -170,13 +197,24 @@ export default function DashboardPage() {
                     {recentReceipts.map((receipt: any, index: number) => (
                       <tr key={receipt.id || index}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {receipt.receiptNumber || receipt.receipt_number || receipt.id}
+                          {(() => {
+                            const businessId = receipt.businessId || receipt.business_id || localStorage.getItem('businessId') || 'BIZ';
+                            const billNo = receipt.receiptNumber || receipt.receipt_number || receipt.id;
+                            let serial = '';
+                            if (typeof billNo === 'number') {
+                              serial = billNo.toString().padStart(2, '0');
+                            } else if (typeof billNo === 'string') {
+                              const match = billNo.match(/(\d+)$/);
+                              serial = match ? match[1].padStart(2, '0') : '01';
+                            } else {
+                              serial = '01';
+                            }
+                            return `GR-${businessId}-${serial}`;
+                          })()}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{customers[receipt.customer_id || receipt.customerId || ''] || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {receipt.date}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {receipt.customerName || receipt.customer_name || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           ₹{receipt.total || receipt.totalAmount || '-'}

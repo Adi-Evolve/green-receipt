@@ -152,26 +152,7 @@ export default function GenerateReceiptPage() {
         });
       }
       setProducts([{ id: '1', name: '', price: 0, quantity: 1, gst: 0, amount: 0 }]);
-      let serial = 1;
-      let prev = localStorage.getItem(`receipts_${bizId}`);
-      if (prev) {
-        try {
-          const arr = JSON.parse(prev);
-          if (Array.isArray(arr) && arr.length > 0) {
-            const serials = arr.map((r:any) => {
-              const match = (r.receiptNumber||'').match(/^GR-([^-]+)-(\d+)$/);
-              return match && match[1] === bizId && match[2] ? parseInt(match[2], 10) : 0;
-            });
-            serial = Math.max(...serials, 0) + 1;
-          }
-        } catch {}
-      }
-      setReceiptNumber(`GR-${bizId}-${serial}`);
-      setDate(new Date().toISOString().split('T')[0]);
-      (async () => {
-        const { data, error } = await supabase.from('customers').select('*').eq('user_code', bizId);
-        if (data) setCustomers(data);
-      })();
+      setReceiptNumber(computeNextReceiptNumber(bizId));
       let loaded = false;
       try {
         const local = localStorage.getItem(`products_${bizId}`);
@@ -186,13 +167,17 @@ export default function GenerateReceiptPage() {
           if (data) setProductsList(data);
         })();
       }
+      (async () => {
+        const { data, error } = await supabase.from('customers').select('*').eq('user_code', bizId);
+        if (data) setCustomers(data);
+      })();
     }
   }, [hasMounted]);
 
   useEffect(() => {
     if (!hasMounted || !format || !businessInfo) return;
     // Update QR value whenever receipt changes
-    const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
+    const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format && format.columns && format.columns.gst ? (1 + p.gst/100) : 1), 0);
     setQrValue(JSON.stringify({
       receiptNumber,
       businessId: businessInfo.businessId || (businessInfo as any).user_code,
@@ -256,24 +241,22 @@ export default function GenerateReceiptPage() {
     }
   }, []);
 
-  if (!hasMounted) return null;
-  if (!businessInfo || (!businessInfo.businessId && !(businessInfo as any).user_code)) {
-    return (
-      <main className="min-h-screen flex flex-col bg-gray-50">
-        <ServerNavbar isLoggedIn={true} />
-        <div className="max-w-2xl mx-auto w-full p-8 text-center">
-          <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
-          <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
-          <button onClick={() => {
-            localStorage.clear();
-            window.location.href = '/login';
-          }} className="btn btn-primary">Log in again</button>
-        </div>
-        <Footer />
-      </main>
-    );
+  // --- Receipt Number Serial Logic ---
+  function computeNextReceiptNumber(bizId: string): string {
+    // Get all receipts and drafts for this business from localStorage
+    let serial = 1;
+    try {
+      const receiptsArr = JSON.parse(localStorage.getItem(`receipts_${bizId}`) || '[]');
+      const draftsArr = JSON.parse(localStorage.getItem(`drafts_${bizId}`) || '[]');
+      const all = [...receiptsArr, ...draftsArr];
+      const serials = all.map((r: any) => {
+        const num = (r.receiptNumber || r.receipt_number || '').toString().match(/GR-[^-]+-(\d+)/);
+        return num ? parseInt(num[1], 10) : 0;
+      });
+      serial = Math.max(...serials, 0) + 1;
+    } catch {}
+    return `GR-${bizId}-${serial}`;
   }
-  if (!format) return null;
 
   // Handle customer input (ID only, numeric)
   const handleCustomerIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -434,15 +417,8 @@ export default function GenerateReceiptPage() {
       else {
         setSaveSuccess(true);
         setQrValue(`${window.location.origin}/view-receipt/${receiptUniqueId}`);
-        // --- Receipt Number Auto-Increment ---
-        // Get current serial from receiptNumber, increment, and set new receipt number
-        const match = receiptNumber.match(/^GR-(.+)-(\d+)$/);
-        if (match) {
-          const bizId = match[1];
-          const currentSerial = parseInt(match[2], 10);
-          const nextSerial = currentSerial + 1;
-          setReceiptNumber(`GR-${bizId}-${nextSerial}`);
-        }
+        // --- Increment serial for next receipt ---
+        setReceiptNumber(computeNextReceiptNumber(bizId));
       }
     } catch (err: unknown) {
       setSaving(false);
@@ -491,8 +467,29 @@ export default function GenerateReceiptPage() {
 
   // Calculate subtotal, gst, total
   const subtotal = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
-  const gstTotal = format.columns.gst ? products.reduce((sum, p) => sum + (p.price * p.quantity * (p.gst/100)), 0) : 0;
+  const gstTotal = format && format.columns && format.columns.gst
+    ? products.reduce((sum, p) => sum + (p.price * p.quantity * (p.gst/100)), 0)
+    : 0;
   const total = subtotal + gstTotal;
+
+  if (!hasMounted) return null;
+  if (!businessInfo || (!businessInfo.businessId && !(businessInfo as any).user_code)) {
+    return (
+      <main className="min-h-screen flex flex-col bg-gray-50">
+        <ServerNavbar isLoggedIn={true} />
+        <div className="max-w-2xl mx-auto w-full p-8 text-center">
+          <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
+          <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
+          <button onClick={() => {
+            localStorage.clear();
+            window.location.href = '/login';
+          }} className="btn btn-primary">Log in again</button>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+  if (!format) return null;
 
   return (
     <main className="min-h-screen flex flex-col">

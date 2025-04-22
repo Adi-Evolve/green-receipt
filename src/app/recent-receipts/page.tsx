@@ -39,6 +39,32 @@ export default function RecentReceiptsPage() {
       });
   }, []);
 
+  useEffect(() => {
+    async function fetchCustomers() {
+      const businessId = localStorage.getItem('businessId');
+      if (!businessId) return;
+      let customersMap: Record<string, string> = {};
+      let local = localStorage.getItem('customers_' + businessId);
+      if (local) {
+        try {
+          const arr = JSON.parse(local);
+          arr.forEach((c: any) => {
+            customersMap[c.customerId || c.id || c.name] = c.name;
+          });
+        } catch {}
+      }
+      // Fetch from Supabase as fallback
+      const { data } = await supabase.from('customers').select('*').eq('user_code', businessId);
+      if (data) {
+        data.forEach((c: any) => {
+          customersMap[c.customerId || c.id || c.name] = c.name;
+        });
+      }
+      setCustomers(customersMap);
+    }
+    fetchCustomers();
+  }, [receipts]);
+
   const filteredReceipts = receipts.filter(receipt => {
     const receiptNumber = (receipt.receipt_number || receipt.receiptNumber || receipt.id || '').toString();
     const customerId = receipt.customer_id || receipt.customerId || '';
@@ -134,6 +160,7 @@ export default function RecentReceiptsPage() {
               <thead className="bg-primary-100 text-primary-900">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Receipt #</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Customer Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Amount</th>
                   <th className="px-6 py-3"></th>
@@ -156,6 +183,7 @@ export default function RecentReceiptsPage() {
                       }
                       return `GR-${businessId}-${serial}`;
                     })()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{customers[receipt.customer_id || receipt.customerId || ''] || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.date}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{Number(receipt.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
