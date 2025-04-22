@@ -19,13 +19,13 @@ export default function ViewReceiptPage() {
       let data, error;
       // Try by id
       ({ data, error } = await supabase.from('receipts').select('*').eq('id', id).maybeSingle());
-      // Try by qrCode if not found
+      // Try by qr_code if not found
       if (!data) {
-        ({ data, error } = await supabase.from('receipts').select('*').eq('qrCode', id).maybeSingle());
+        ({ data, error } = await supabase.from('receipts').select('*').eq('qr_code', id).maybeSingle());
       }
-      // Try by receiptUniqueId if still not found
+      // Try by receipt_id if still not found
       if (!data) {
-        ({ data, error } = await supabase.from('receipts').select('*').eq('receiptUniqueId', id).maybeSingle());
+        ({ data, error } = await supabase.from('receipts').select('*').eq('receipt_id', id).maybeSingle());
       }
       if (error || !data) {
         setError('Receipt not found');
