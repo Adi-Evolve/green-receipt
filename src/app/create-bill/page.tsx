@@ -1,3 +1,5 @@
+"use client";
+
 import ServerNavbar from '@/components/ServerNavbar';
 import Footer from '@/components/Footer';
 import ReceiptEditor from './components/ReceiptEditor';

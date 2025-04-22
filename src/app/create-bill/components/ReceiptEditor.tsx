@@ -5,7 +5,7 @@ import Link from 'next/link';
 import ReceiptPreview from './ReceiptPreview';
 import QRCode from 'qrcode.react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 // Define interfaces for our data structures
 interface Product {
