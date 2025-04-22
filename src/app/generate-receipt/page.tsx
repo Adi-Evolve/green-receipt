@@ -222,7 +222,10 @@ export default function GenerateReceiptPage() {
       if (selectedCustomer.name) msg += `\nName: ${selectedCustomer.name}`;
       msg += `\nDate: ${date}`;
       msg += `\nTotal: ₹${products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0).toFixed(2)}`;
-      msg += `\nView full receipt: ${window.location.origin}/view-receipt/${receiptNumber}`;
+      // Use receiptUniqueId for the view link (from last save)
+      if (qrValue) {
+        msg += `\nView full receipt: ${qrValue}`;
+      }
       // Open WhatsApp Web (or app) with prefilled message
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
     }
@@ -431,6 +434,15 @@ export default function GenerateReceiptPage() {
       else {
         setSaveSuccess(true);
         setQrValue(`${window.location.origin}/view-receipt/${receiptUniqueId}`);
+        // --- Receipt Number Auto-Increment ---
+        // Get current serial from receiptNumber, increment, and set new receipt number
+        const match = receiptNumber.match(/^GR-(.+)-(\d+)$/);
+        if (match) {
+          const bizId = match[1];
+          const currentSerial = parseInt(match[2], 10);
+          const nextSerial = currentSerial + 1;
+          setReceiptNumber(`GR-${bizId}-${nextSerial}`);
+        }
       }
     } catch (err: unknown) {
       setSaving(false);
