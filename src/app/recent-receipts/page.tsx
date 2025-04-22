@@ -76,6 +76,28 @@ export default function RecentReceiptsPage() {
     return 0;
   });
 
+  // Delete receipt from Supabase and localStorage
+  async function handleDeleteReceipt(receipt: any) {
+    if (!window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) return;
+    const businessId = localStorage.getItem('businessId');
+    // Remove from Supabase
+    let idField = receipt.id ? 'id' : receipt.receipt_id ? 'receipt_id' : receipt.qr_code ? 'qr_code' : null;
+    if (idField) {
+      await supabase.from('receipts').delete().eq(idField, receipt[idField]);
+    }
+    // Remove from localStorage
+    if (businessId) {
+      const key = `receipts_${businessId}`;
+      let arr = [];
+      try {
+        arr = JSON.parse(localStorage.getItem(key) || '[]');
+      } catch {}
+      arr = arr.filter((r: any) => r[idField] !== receipt[idField]);
+      localStorage.setItem(key, JSON.stringify(arr));
+    }
+    setReceipts(prev => prev.filter(r => r[idField] !== receipt[idField]));
+  }
+
   return (
     <main className="min-h-screen flex flex-col bg-gray-50">
       <ServerNavbar isLoggedIn={true} />
@@ -136,6 +158,7 @@ export default function RecentReceiptsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{Number(receipt.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <Link href={`/view-receipt/${receipt.receiptUniqueId || receipt.id}`} className="text-primary-600 hover:text-primary-900">View</Link>
+                      <button className="ml-4 text-red-600 hover:text-red-900" onClick={() => handleDeleteReceipt(receipt)}>Delete</button>
                     </td>
                   </tr>
                 ))}

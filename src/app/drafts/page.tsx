@@ -56,10 +56,10 @@ export default function DraftsPage() {
               <li key={idx} className="bg-white p-4 rounded shadow flex justify-between items-center">
                 <span>Draft #{draft.receiptNumber || draft.draftId} - Last edited: {draft.date}</span>
                 <button className="btn-primary" onClick={() => {
-                  // Resume draft: redirect to generate-receipt with draft data
+                  // Edit draft: redirect to generate-receipt with draft data
                   localStorage.setItem('draftToResume', JSON.stringify(draft));
                   window.location.href = '/generate-receipt?draft=1';
-                }}>Resume</button>
+                }}>Edit</button>
                 <button className="btn-danger" onClick={() => deleteDraft(draft.id)}>Delete</button>
               </li>
             ))}
