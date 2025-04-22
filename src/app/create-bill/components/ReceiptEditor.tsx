@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ReceiptPreview from './ReceiptPreview';
 import QRCode from 'qrcode.react';
 import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from 'next/router';
 
 // Define interfaces for our data structures
 interface Product {
@@ -108,6 +109,39 @@ const ReceiptEditor = () => {
     gst: ''
   });
   const [addingCustomer, setAddingCustomer] = useState(false);
+
+  // State for product import
+  const [importingProducts, setImportingProducts] = useState(false);
+  const productFileInput = React.createRef<HTMLInputElement>();
+
+  // --- Product options for dropdown ---
+  const [productOptions, setProductOptions] = useState<Product[]>([]);
+
+  const router = useRouter();
+
+  // Load product options from localStorage and then DB (deduplicated)
+  useEffect(() => {
+    async function fetchProducts() {
+      const user_code = typeof window !== 'undefined' ? localStorage.getItem('user_code') : '';
+      let localProducts: Product[] = [];
+      try {
+        const localRaw = localStorage.getItem('products_' + user_code);
+        if (localRaw) localProducts = JSON.parse(localRaw);
+      } catch {}
+      setProductOptions(localProducts);
+      // Only fetch from DB if local is empty
+      if (!localProducts.length) {
+        const { data: dbProducts, error } = await supabase.from('products').select('*').eq('user_code', user_code);
+        if (dbProducts && dbProducts.length) {
+          // Deduplicate by name (case-insensitive)
+          const localNames = new Set(localProducts.map(p => p.name.trim().toLowerCase()));
+          const uniqueDbProducts = dbProducts.filter((p: Product) => !localNames.has(p.name.trim().toLowerCase()));
+          setProductOptions([...localProducts, ...uniqueDbProducts]);
+        }
+      }
+    }
+    fetchProducts();
+  }, []);
 
   // Calculate totals whenever products change
   useEffect(() => {
@@ -231,12 +265,12 @@ const ReceiptEditor = () => {
     // In a real app, this would save to the database
     alert('Receipt saved successfully!');
     // Here you would typically make an API call to save the receipt
-    
-    // After saving, if customerPhone is present, open WhatsApp
+    // After saving, if customerPhone is present, open WhatsApp and redirect to dashboard
     if (receipt.customerPhone) {
       const url = `https://wa.me/${receipt.customerPhone.replace(/\D/g,'')}?text=Thank you for your purchase! Your receipt number is ${receipt.receiptNumber}.`;
       window.open(url, '_blank');
     }
+    router.replace('/dashboard');
   };
 
   // Handle saving as draft
@@ -272,6 +306,36 @@ const ReceiptEditor = () => {
     setShowNewCustomer(false);
     setNewCustomer({ name: '', phone: '', address: '', email: '', gst: '' });
   }
+
+  // Handle importing products
+  const handleImportProducts = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!productFileInput.current || !productFileInput.current.files) return;
+    setImportingProducts(true);
+    const file = productFileInput.current.files[0];
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      if (!event.target?.result) return;
+      const csvData = event.target.result as string;
+      const products = csvData.split('\n').map((row) => {
+        const [name, price, quantity, gst] = row.split(',');
+        return {
+          id: `${receipt.products.length + 1}`,
+          name,
+          price: parseFloat(price) || 0,
+          quantity: parseInt(quantity) || 1,
+          gst: parseFloat(gst) || 0,
+          amount: 0
+        };
+      });
+      setReceipt(prev => ({
+        ...prev,
+        products: [...prev.products, ...products]
+      }));
+      setImportingProducts(false);
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -434,7 +498,6 @@ const ReceiptEditor = () => {
                     New Customer
                   </button>
                 </div>
-                
                 <div className="sm:col-span-3">
                   <label htmlFor="customerName" className="block text-sm font-medium text-gray-700">Customer Name</label>
                   <input
@@ -448,7 +511,6 @@ const ReceiptEditor = () => {
                     required
                   />
                 </div>
-                
                 <div className="sm:col-span-3">
                   <label htmlFor="customerPhone" className="block text-sm font-medium text-gray-700">Customer Phone</label>
                   <input
@@ -460,7 +522,6 @@ const ReceiptEditor = () => {
                     className="input-field"
                   />
                 </div>
-                
                 <div className="sm:col-span-3">
                   <label htmlFor="date" className="block text-sm font-medium text-gray-700">Date</label>
                   <input
@@ -473,27 +534,45 @@ const ReceiptEditor = () => {
                   />
                 </div>
               </div>
+              {showNewCustomer && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+                  <div className="bg-white p-6 rounded shadow-md w-full max-w-md">
+                    <h3 className="text-lg font-semibold mb-4">Add New Customer</h3>
+                    <div className="space-y-3">
+                      <input name="name" value={newCustomer.name} onChange={handleNewCustomerChange} placeholder="Name (required)" className="w-full border px-3 py-2 rounded" required />
+                      <input name="phone" value={newCustomer.phone} onChange={handleNewCustomerChange} placeholder="Phone" className="w-full border px-3 py-2 rounded" />
+                      <input name="address" value={newCustomer.address} onChange={handleNewCustomerChange} placeholder="Address" className="w-full border px-3 py-2 rounded" />
+                      <input name="email" value={newCustomer.email} onChange={handleNewCustomerChange} placeholder="Email" className="w-full border px-3 py-2 rounded" />
+                      <input name="gst" value={newCustomer.gst} onChange={handleNewCustomerChange} placeholder="GST" className="w-full border px-3 py-2 rounded" />
+                    </div>
+                    <div className="flex justify-end gap-2 mt-4">
+                      <button onClick={()=>setShowNewCustomer(false)} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
+                      <button onClick={addNewCustomer} className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600" disabled={addingCustomer}>{addingCustomer ? 'Adding...' : 'Add Customer'}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
-          {showNewCustomer && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-              <div className="bg-white p-6 rounded shadow-md w-full max-w-md">
-                <h3 className="text-lg font-semibold mb-4">Add New Customer</h3>
-                <div className="space-y-3">
-                  <input name="name" value={newCustomer.name} onChange={handleNewCustomerChange} placeholder="Name (required)" className="w-full border px-3 py-2 rounded" required />
-                  <input name="phone" value={newCustomer.phone} onChange={handleNewCustomerChange} placeholder="Phone" className="w-full border px-3 py-2 rounded" />
-                  <input name="address" value={newCustomer.address} onChange={handleNewCustomerChange} placeholder="Address" className="w-full border px-3 py-2 rounded" />
-                  <input name="email" value={newCustomer.email} onChange={handleNewCustomerChange} placeholder="Email" className="w-full border px-3 py-2 rounded" />
-                  <input name="gst" value={newCustomer.gst} onChange={handleNewCustomerChange} placeholder="GST" className="w-full border px-3 py-2 rounded" />
-                </div>
-                <div className="flex justify-end gap-2 mt-4">
-                  <button onClick={()=>setShowNewCustomer(false)} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
-                  <button onClick={addNewCustomer} className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600" disabled={addingCustomer}>{addingCustomer ? 'Adding...' : 'Add Customer'}</button>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Import Products (CSV)</label>
+            <form onSubmit={handleImportProducts} className="flex items-center gap-2">
+              <input
+                type="file"
+                ref={productFileInput}
+                accept=".csv"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-4 py-2 rounded-full transition-colors shadow"
+                disabled={importingProducts}
+              >
+                {importingProducts ? 'Importing...' : 'Import'}
+              </button>
+            </form>
+          </div>
           
           <div className="mt-6 border-t border-gray-200 pt-6">
             <div className="flex justify-between items-center mb-4">

@@ -15,29 +15,35 @@ export default function ViewReceiptPage() {
 
   useEffect(() => {
     if (!id) return;
-    supabase
-      .from('receipts')
-      .select('*')
-      .or(`qrCode.eq.${id},receiptUniqueId.eq.${id},id.eq.${id}`)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          setError('Receipt not found');
-        } else {
-          let businessInfo = data.businessInfo || {};
-          if (typeof window !== 'undefined') {
-            const profile = localStorage.getItem('businessInfo');
-            if (profile) {
-              try {
-                const parsed = JSON.parse(profile);
-                if (!businessInfo.name || businessInfo.name === 'Business Name') businessInfo.name = parsed.businessName || parsed.name;
-                if (!businessInfo.businessId) businessInfo.businessId = parsed.businessId;
-              } catch {}
-            }
+    (async () => {
+      let data, error;
+      // Try by id
+      ({ data, error } = await supabase.from('receipts').select('*').eq('id', id).maybeSingle());
+      // Try by qrCode if not found
+      if (!data) {
+        ({ data, error } = await supabase.from('receipts').select('*').eq('qrCode', id).maybeSingle());
+      }
+      // Try by receiptUniqueId if still not found
+      if (!data) {
+        ({ data, error } = await supabase.from('receipts').select('*').eq('receiptUniqueId', id).maybeSingle());
+      }
+      if (error || !data) {
+        setError('Receipt not found');
+      } else {
+        let businessInfo = data.businessInfo || {};
+        if (typeof window !== 'undefined') {
+          const profile = localStorage.getItem('businessInfo');
+          if (profile) {
+            try {
+              const parsed = JSON.parse(profile);
+              if (!businessInfo.name || businessInfo.name === 'Business Name') businessInfo.name = parsed.businessName || parsed.name;
+              if (!businessInfo.businessId) businessInfo.businessId = parsed.businessId;
+            } catch {}
           }
-          setReceipt({ ...data, businessInfo });
         }
-      });
+        setReceipt({ ...data, businessInfo });
+      }
+    })();
   }, [id]);
 
   function handleDownloadPDF() {

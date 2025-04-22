@@ -202,29 +202,43 @@ export default function ProfilePage() {
       <main className="min-h-screen flex flex-col bg-gray-50">
         <ServerNavbar isLoggedIn={true} businessName={businessInfo.businessName} />
         {backupImportPanel}
-        <div className="flex-grow max-w-2xl mx-auto px-4 py-12">
-          <div className="bg-white rounded shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Business Profile</h2>
-              <button className="btn-primary text-sm" onClick={() => setEditing(true)}>
+        <div className="flex-grow max-w-3xl mx-auto px-4 py-12">
+          <div className="bg-white rounded-xl shadow-lg p-8 flex flex-col md:flex-row gap-8 items-center">
+            <div className="flex-1 flex flex-col items-center md:items-start gap-4">
+              <div className="flex items-center gap-4 w-full">
+                {businessInfo.logoUrl ? (
+                  <img src={businessInfo.logoUrl} alt="Logo" className="h-24 w-24 rounded-full border-4 border-primary-100 shadow" />
+                ) : (
+                  <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center text-3xl font-bold text-gray-400 border-4 border-primary-100">
+                    <span>Logo</span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-primary-800 mb-1">{businessInfo.businessName}</h2>
+                  <div className="text-gray-600 text-sm mb-2">Business ID: <span className="font-mono">{businessInfo.businessId}</span></div>
+                  <div className="text-gray-500 text-xs">GST: {businessInfo.gst}</div>
+                </div>
+              </div>
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div>
+                  <div className="font-semibold text-gray-700 mb-1">Address</div>
+                  <div className="text-gray-900 whitespace-pre-line">{businessInfo.address}</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-700 mb-1">Contact</div>
+                  <div className="text-gray-900">Email: {businessInfo.email}</div>
+                  <div className="text-gray-900">Phone: {businessInfo.phone}</div>
+                </div>
+                <div className="md:col-span-2">
+                  <div className="font-semibold text-gray-700 mb-1">Terms & Conditions</div>
+                  <div className="text-gray-900 whitespace-pre-line">{businessInfo.terms}</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-4 min-w-[120px]">
+              <button className="btn-primary w-full" onClick={() => setEditing(true)}>
                 Edit Profile
               </button>
-            </div>
-            <div className="flex flex-col md:flex-row gap-8">
-              <div className="flex-1 space-y-2">
-                <div><b>Business Name:</b> {businessInfo.businessName}</div>
-                <div><b>Business ID:</b> {businessInfo.businessId}</div>
-                <div><b>GST Number:</b> {businessInfo.gst}</div>
-                <div><b>Address:</b> {businessInfo.address}</div>
-                <div><b>Email:</b> {businessInfo.email}</div>
-                <div><b>Phone:</b> {businessInfo.phone}</div>
-                <div><b>Terms & Conditions:</b> {businessInfo.terms}</div>
-              </div>
-              <div className="flex-1 flex flex-col items-center justify-center">
-                {businessInfo.logoUrl && (
-                  <img src={businessInfo.logoUrl} alt="Logo" className="h-32 rounded border mb-2" />
-                )}
-              </div>
             </div>
           </div>
         </div>

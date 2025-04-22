@@ -6,6 +6,7 @@ import LoginForm from './components/LoginForm';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +16,26 @@ export default function LoginPage() {
     if (user) {
       router.replace('/dashboard');
     }
+    // Google sign-in post-redirect logic
+    async function checkGoogleUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { email, user_metadata } = user;
+        // Try to get as much info as possible
+        const name = user_metadata.full_name || user_metadata.name || '';
+        const phone = user.phone || user_metadata.phone || '';
+        // Save to DB (users table)
+        const { data: dbUser, error } = await supabase.from('users').upsert([
+          { id: user.id, email, name, phone }
+        ]).select();
+        // Save to localStorage
+        const profile = { id: user.id, email, name, phone };
+        localStorage.setItem('user', JSON.stringify(profile));
+        localStorage.setItem('profile', JSON.stringify(profile));
+        router.replace('/dashboard');
+      }
+    }
+    checkGoogleUser();
   }, [router]);
 
   return (

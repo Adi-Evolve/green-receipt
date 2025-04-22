@@ -172,9 +172,22 @@ export default function ProductsPage() {
           <button onClick={handleExport} className="btn btn-sm btn-green" disabled={role!=='admin'}>Export CSV</button>
           <button onClick={handleSync} className="btn btn-sm btn-blue" disabled={syncing}>Sync</button>
           <button onClick={handleUndo} className="btn btn-sm btn-yellow">Undo</button>
-          <input type="file" ref={fileInput} accept=".csv" onChange={handleImport} className="hidden" />
-          <button onClick={()=>fileInput.current?.click()} className="bg-gradient-to-r from-green-400 to-blue-500 text-white px-4 py-2 rounded shadow hover:from-green-500 hover:to-blue-600 transition-all font-semibold" disabled={role!=='admin'}>Import CSV</button>
         </div>
+        <form onSubmit={handleImport} className="flex items-center gap-2 mb-4">
+          <input
+            type="file"
+            ref={fileInput}
+            accept=".csv"
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-4 py-2 rounded-full transition-colors shadow"
+            disabled={importing}
+          >
+            {importing ? 'Importing...' : 'Import'}
+          </button>
+        </form>
         {toast && <Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
         <table className="w-full border mt-2">
           <thead>

@@ -1,10 +1,16 @@
 'use client';
 import React from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function GoogleSignInButton() {
-  function handleGoogleSignIn() {
-    // Redirect to backend Google OAuth endpoint
-    window.location.href = '/api/auth/google';
+  async function handleGoogleSignIn() {
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { scopes: 'profile email https://www.googleapis.com/auth/user.phonenumbers.read' } });
+    if (error) {
+      alert('Google sign-in failed: ' + error.message);
+      return;
+    }
+    // Supabase will redirect, but if not, handle post-sign-in here
+    // Save user data to localStorage and DB after redirect
   }
   return (
     <button

@@ -10,19 +10,29 @@ import { FaRegFileAlt } from 'react-icons/fa';
 import NotificationBell from '../components/NotificationBell';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { getUserRole, RoleManager } from '../components/RoleManager';
 
 export default function DashboardPage() {
   // All hooks must be at the top, before any return
   const [hasMounted, setHasMounted] = useState(false);
-  const [businessName, setBusinessName] = useState('Business User');
+  const [businessName, setBusinessName] = useState('');
   const [businessId, setBusinessId] = useState('');
   const [recentReceipts, setRecentReceipts] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [userCode, setUserCode] = useState('');
-  const role = typeof window !== 'undefined' ? getUserRole() : undefined;
 
   useEffect(() => { setHasMounted(true); }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const info = localStorage.getItem('businessInfo');
+      if (info) {
+        try {
+          const parsed = JSON.parse(info);
+          setBusinessName(parsed.businessName || parsed.name || '');
+        } catch {}
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasMounted) return;
@@ -33,7 +43,6 @@ export default function DashboardPage() {
         const saved = localStorage.getItem('businessInfo');
         if (saved) parsed = JSON.parse(saved);
       } catch {}
-      setBusinessName(parsed?.businessName || 'Business User');
       setBusinessId(parsed?.businessId || '');
       setUserCode(localStorage.getItem('user_code') || parsed?.businessId || '');
     }
@@ -193,7 +202,6 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          <RoleManager />
           <Footer />
         </div>
       </div>
