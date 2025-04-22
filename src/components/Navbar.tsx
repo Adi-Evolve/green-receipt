@@ -11,9 +11,8 @@ interface NavbarProps {
 const Navbar = ({ isLoggedIn, businessName }: NavbarProps) => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Fetch business name from localStorage if not provided
   const [bizName, setBizName] = useState(businessName || '');
+
   useEffect(() => {
     if (!businessName && typeof window !== 'undefined') {
       const saved = localStorage.getItem('businessInfo');
@@ -202,4 +201,4 @@ const Navbar = ({ isLoggedIn, businessName }: NavbarProps) => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

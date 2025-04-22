@@ -159,7 +159,7 @@ export default function CustomersPage() {
           <button onClick={handleSync} className="btn btn-sm btn-blue" disabled={syncing}>Sync</button>
           <button onClick={handleUndo} className="btn btn-sm btn-yellow">Undo</button>
           <input type="file" ref={fileInput} accept=".csv" onChange={handleImport} className="hidden" />
-          <button onClick={()=>fileInput.current?.click()} className="btn btn-sm btn-gray" disabled={role!=='admin'}>Import CSV</button>
+          <button onClick={()=>fileInput.current?.click()} className="bg-gradient-to-r from-green-400 to-blue-500 text-white px-4 py-2 rounded shadow hover:from-green-500 hover:to-blue-600 transition-all font-semibold" disabled={role!=='admin'}>Import CSV</button>
         </div>
         {toast && <Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
         <table className="w-full border mt-2">

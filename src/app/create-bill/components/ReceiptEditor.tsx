@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ReceiptPreview from './ReceiptPreview';
 import QRCode from 'qrcode.react';
+import { supabase } from '@/lib/supabaseClient';
 
 // Define interfaces for our data structures
 interface Product {
@@ -96,6 +97,17 @@ const ReceiptEditor = () => {
   
   // State for QR Code
   const [qrValue, setQrValue] = useState('');
+
+  // State for new customer modal
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    email: '',
+    gst: ''
+  });
+  const [addingCustomer, setAddingCustomer] = useState(false);
 
   // Calculate totals whenever products change
   useEffect(() => {
@@ -215,10 +227,16 @@ const ReceiptEditor = () => {
   };
 
   // Handle saving the receipt
-  const saveReceipt = () => {
+  const saveReceipt = async () => {
     // In a real app, this would save to the database
     alert('Receipt saved successfully!');
     // Here you would typically make an API call to save the receipt
+    
+    // After saving, if customerPhone is present, open WhatsApp
+    if (receipt.customerPhone) {
+      const url = `https://wa.me/${receipt.customerPhone.replace(/\D/g,'')}?text=Thank you for your purchase! Your receipt number is ${receipt.receiptNumber}.`;
+      window.open(url, '_blank');
+    }
   };
 
   // Handle saving as draft
@@ -228,6 +246,33 @@ const ReceiptEditor = () => {
     alert('Receipt saved as draft!');
   };
   
+  // Handle new customer input
+  function handleNewCustomerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setNewCustomer(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  }
+
+  // Handle saving new customer
+  async function addNewCustomer() {
+    if (!newCustomer.name) return alert('Name is required');
+    setAddingCustomer(true);
+    // Save to Supabase
+    const user_code = typeof window !== 'undefined' ? localStorage.getItem('user_code') : '';
+    const { data, error } = await supabase.from('customers').insert([{ ...newCustomer, user_code }]).select();
+    setAddingCustomer(false);
+    if (error) return alert('Failed to save customer');
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      const prev = localStorage.getItem('customers_' + user_code);
+      let arr = [];
+      try { arr = prev ? JSON.parse(prev) : []; } catch {}
+      arr.push(data[0]);
+      localStorage.setItem('customers_' + user_code, JSON.stringify(arr));
+    }
+    setReceipt(prev => ({ ...prev, customerName: newCustomer.name, customerPhone: newCustomer.phone, customerId: data[0].id }));
+    setShowNewCustomer(false);
+    setNewCustomer({ name: '', phone: '', address: '', email: '', gst: '' });
+  }
+
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       {!showPreview ? (
@@ -371,68 +416,80 @@ const ReceiptEditor = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Information</h3>
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-3">
-                  <label htmlFor="customerName" className="block text-sm font-medium text-gray-700">
-                    Customer Name
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      name="customerName"
-                      id="customerName"
-                      value={receipt.customerName}
-                      onChange={handleInputChange}
-                      className="input-field"
-                    />
-                  </div>
+                  <label htmlFor="customerId" className="block text-sm font-medium text-gray-700">Customer ID</label>
+                  <input
+                    type="text"
+                    name="customerId"
+                    id="customerId"
+                    value={receipt.customerId}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="Enter customer ID or leave blank"
+                  />
+                  <button
+                    type="button"
+                    className="mt-2 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
+                    onClick={() => setShowNewCustomer(true)}
+                  >
+                    New Customer
+                  </button>
                 </div>
                 
                 <div className="sm:col-span-3">
-                  <label htmlFor="customerPhone" className="block text-sm font-medium text-gray-700">
-                    Customer Phone
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      name="customerPhone"
-                      id="customerPhone"
-                      value={receipt.customerPhone}
-                      onChange={handleInputChange}
-                      className="input-field"
-                    />
-                  </div>
+                  <label htmlFor="customerName" className="block text-sm font-medium text-gray-700">Customer Name</label>
+                  <input
+                    type="text"
+                    name="customerName"
+                    id="customerName"
+                    value={receipt.customerName}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="Customer name"
+                    required
+                  />
                 </div>
                 
                 <div className="sm:col-span-3">
-                  <label htmlFor="customerId" className="block text-sm font-medium text-gray-700">
-                    Customer ID (10-digit)
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      name="customerId"
-                      id="customerId"
-                      value={receipt.customerId}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      placeholder="Enter customer's 10-digit ID"
-                    />
-                  </div>
+                  <label htmlFor="customerPhone" className="block text-sm font-medium text-gray-700">Customer Phone</label>
+                  <input
+                    type="text"
+                    name="customerPhone"
+                    id="customerPhone"
+                    value={receipt.customerPhone}
+                    onChange={handleInputChange}
+                    className="input-field"
+                  />
                 </div>
                 
                 <div className="sm:col-span-3">
-                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                    Date
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      type="date"
-                      name="date"
-                      id="date"
-                      value={receipt.date}
-                      onChange={handleInputChange}
-                      className="input-field"
-                    />
-                  </div>
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">Date</label>
+                  <input
+                    type="date"
+                    name="date"
+                    id="date"
+                    value={receipt.date}
+                    onChange={handleInputChange}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {showNewCustomer && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+              <div className="bg-white p-6 rounded shadow-md w-full max-w-md">
+                <h3 className="text-lg font-semibold mb-4">Add New Customer</h3>
+                <div className="space-y-3">
+                  <input name="name" value={newCustomer.name} onChange={handleNewCustomerChange} placeholder="Name (required)" className="w-full border px-3 py-2 rounded" required />
+                  <input name="phone" value={newCustomer.phone} onChange={handleNewCustomerChange} placeholder="Phone" className="w-full border px-3 py-2 rounded" />
+                  <input name="address" value={newCustomer.address} onChange={handleNewCustomerChange} placeholder="Address" className="w-full border px-3 py-2 rounded" />
+                  <input name="email" value={newCustomer.email} onChange={handleNewCustomerChange} placeholder="Email" className="w-full border px-3 py-2 rounded" />
+                  <input name="gst" value={newCustomer.gst} onChange={handleNewCustomerChange} placeholder="GST" className="w-full border px-3 py-2 rounded" />
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button onClick={()=>setShowNewCustomer(false)} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
+                  <button onClick={addNewCustomer} className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600" disabled={addingCustomer}>{addingCustomer ? 'Adding...' : 'Add Customer'}</button>
                 </div>
               </div>
             </div>

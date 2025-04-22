@@ -23,7 +23,7 @@ export default function DashboardClient() {
       const saved = localStorage.getItem('businessInfo');
       if (saved) {
         const parsed = JSON.parse(saved);
-        setBusinessName(parsed.businessName || 'Business User');
+        setBusinessName(parsed.businessName || parsed.name || 'Business User');
         setBusinessId(parsed.businessId || '');
       } else {
         setBusinessName('Business User');
