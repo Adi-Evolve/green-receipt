@@ -41,7 +41,17 @@ export default function ViewReceiptPage() {
             } catch {}
           }
         }
-        setReceipt({ ...data, businessInfo, products: Array.isArray(data.products) ? data.products : [] });
+        // Always ensure products is an array (parse if string)
+        let productsArr: any[] = [];
+        if (Array.isArray(data.products)) {
+          productsArr = data.products;
+        } else if (typeof data.products === 'string') {
+          try {
+            const parsed = JSON.parse(data.products);
+            if (Array.isArray(parsed)) productsArr = parsed;
+          } catch {}
+        }
+        setReceipt({ ...data, businessInfo, products: productsArr });
       }
     })();
   }, [id]);

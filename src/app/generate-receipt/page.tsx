@@ -354,7 +354,7 @@ export default function GenerateReceiptPage() {
     // Show suggestions for product name
     if (value.length > 0) {
       const suggestions = productsList.filter(
-        (prod: any) => prod.productName?.toLowerCase().includes(value.toLowerCase())
+        (prod: any) => (prod.productName || prod.name)?.toLowerCase().includes(value.toLowerCase())
       );
       setProductSuggestions(suggestions);
     } else {
@@ -363,7 +363,6 @@ export default function GenerateReceiptPage() {
   };
 
   const handleSelectProductSuggestion = (idx: number, prod: any) => {
-    // Auto-fill product fields based on selection
     const updated = [...products];
     updated[idx].name = prod.productName || prod.name || '';
     updated[idx].price = prod.price || 0;
