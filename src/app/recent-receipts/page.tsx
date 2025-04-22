@@ -81,10 +81,12 @@ export default function RecentReceiptsPage() {
     if (!window.confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) return;
     const businessId = localStorage.getItem('businessId');
     // Remove from Supabase
-    let idField = receipt.id ? 'id' : receipt.receipt_id ? 'receipt_id' : receipt.qr_code ? 'qr_code' : null;
-    if (idField) {
-      await supabase.from('receipts').delete().eq(idField, receipt[idField]);
+    let idField: 'id' | 'receipt_id' | 'qr_code' | null = receipt.id ? 'id' : receipt.receipt_id ? 'receipt_id' : receipt.qr_code ? 'qr_code' : null;
+    if (!idField) {
+      alert('Could not determine receipt ID field for deletion.');
+      return;
     }
+    await supabase.from('receipts').delete().eq(idField, receipt[idField]);
     // Remove from localStorage
     if (businessId) {
       const key = `receipts_${businessId}`;
@@ -92,10 +94,10 @@ export default function RecentReceiptsPage() {
       try {
         arr = JSON.parse(localStorage.getItem(key) || '[]');
       } catch {}
-      arr = arr.filter((r: any) => r[idField] !== receipt[idField]);
+      arr = arr.filter((r: any) => r && r[idField] !== receipt[idField]);
       localStorage.setItem(key, JSON.stringify(arr));
     }
-    setReceipts(prev => prev.filter(r => r[idField] !== receipt[idField]));
+    setReceipts(prev => prev.filter(r => r && r[idField] !== receipt[idField]));
   }
 
   return (
