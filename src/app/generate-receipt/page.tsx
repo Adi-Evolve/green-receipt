@@ -113,7 +113,6 @@ export default function GenerateReceiptPage() {
 
   useEffect(() => {
     if (!hasMounted) return;
-    // Only run on client
     let bizInfo: any = null;
     let bizId = '';
     const savedBiz = localStorage.getItem('businessInfo');
@@ -124,9 +123,7 @@ export default function GenerateReceiptPage() {
       } catch {}
     }
     setBusinessInfo(bizInfo);
-    // Set default format, products, etc only if business info is present
     if (bizId) {
-      // Receipt format
       let all = [];
       try {
         const arr = JSON.parse(localStorage.getItem(`billDesigns_${bizId}`) || '[]');
@@ -139,16 +136,13 @@ export default function GenerateReceiptPage() {
         setFormat(all[0].designData);
         setSelectedFormatName(all[0].name);
       }
-      // Default format fallback
       if (all.length === 0) {
         setFormat({
           columns: { product: true, quantity: true, gst: true, price: true, amount: true },
           elements: { logo: true, businessInfo: true, customerInfo: true, termsAndConditions: false, warranty: true, qrCode: true },
         });
       }
-      // Products
       setProducts([{ id: '1', name: '', price: 0, quantity: 1, gst: 0, amount: 0 }]);
-      // Receipt number
       let serial = 1;
       let prev = localStorage.getItem(`receipts_${bizId}`);
       if (prev) {
@@ -165,12 +159,10 @@ export default function GenerateReceiptPage() {
       }
       setReceiptNumber(`GR-${bizId}-${serial}`);
       setDate(new Date().toISOString().split('T')[0]);
-      // Customers
       (async () => {
         const { data } = await supabase.from('customers').select('*').eq('user_code', bizId);
         if (data) setCustomers(data);
       })();
-      // Products list
       let loaded = false;
       try {
         const local = localStorage.getItem(`products_${bizId}`);
@@ -188,31 +180,8 @@ export default function GenerateReceiptPage() {
     }
   }, [hasMounted]);
 
-  if (!hasMounted) {
-    return null;
-  }
-
-  if (!businessInfo || (!businessInfo.businessId && !(businessInfo as any).user_code)) {
-    return (
-      <main className="min-h-screen flex flex-col bg-gray-50">
-        <ServerNavbar isLoggedIn={true} />
-        <div className="max-w-2xl mx-auto w-full p-8 text-center">
-          <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
-          <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
-          <button onClick={() => {
-            localStorage.clear();
-            window.location.href = '/login';
-          }} className="btn btn-primary">Log in again</button>
-        </div>
-        <Footer />
-      </main>
-    );
-  }
-
-  if (!format) return null;
-  if (!businessInfo) return null;
-
   useEffect(() => {
+    if (!hasMounted || !format || !businessInfo) return;
     // Update QR value whenever receipt changes
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
     setQrValue(JSON.stringify({
@@ -227,6 +196,7 @@ export default function GenerateReceiptPage() {
   }, [products, customerId, receiptNumber, businessInfo, date, format]);
 
   useEffect(() => {
+    if (!hasMounted || !format || !businessInfo) return;
     // When selectedFormatName changes, always update format
     if (!selectedFormatName || allFormats.length === 0) return;
     const found = allFormats.find(f => f.name === selectedFormatName);
@@ -234,6 +204,7 @@ export default function GenerateReceiptPage() {
   }, [selectedFormatName, allFormats]);
 
   useEffect(() => {
+    if (!hasMounted || !format || !businessInfo) return;
     if (saveSuccess && selectedCustomer && selectedCustomer.phone) {
       // Format WhatsApp URL
       const phone = selectedCustomer.phone.replace(/\D/g, '');
@@ -246,10 +217,10 @@ export default function GenerateReceiptPage() {
       // Open WhatsApp Web (or app) with prefilled message
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
     }
-    // eslint-disable-next-line
   }, [saveSuccess]);
 
   useEffect(() => {
+    if (!hasMounted) return;
     // On mount, if ?draft=1 and draftToResume in localStorage, load draft into form
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -272,6 +243,25 @@ export default function GenerateReceiptPage() {
       }
     }
   }, []);
+
+  if (!hasMounted) return null;
+  if (!businessInfo || (!businessInfo.businessId && !(businessInfo as any).user_code)) {
+    return (
+      <main className="min-h-screen flex flex-col bg-gray-50">
+        <ServerNavbar isLoggedIn={true} />
+        <div className="max-w-2xl mx-auto w-full p-8 text-center">
+          <h2 className="text-xl font-bold mb-4 text-red-600">Business info missing</h2>
+          <p className="mb-4">Your business profile is not loaded. Please log out and log in again to continue.</p>
+          <button onClick={() => {
+            localStorage.clear();
+            window.location.href = '/login';
+          }} className="btn btn-primary">Log in again</button>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+  if (!format) return null;
 
   // Handle customer input (ID only, numeric)
   const handleCustomerIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
