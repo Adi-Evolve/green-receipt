@@ -37,3 +37,5 @@ export function TopPieChart({ data, title }: { data: { name: string, value: numb
     </div>
   );
 }
+
+// No recent receipt section here, so nothing to remove.

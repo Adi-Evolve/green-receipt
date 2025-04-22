@@ -1,7 +1,26 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from '@/lib/supabaseClient';
 
-export default function ReceiptView({ receipt }: { receipt: any }) {
-  if (!receipt) return null;
+export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?: any, id?: string }) {
+  const [receipt, setReceipt] = useState<any>(initialReceipt || null);
+  const [loading, setLoading] = useState(!initialReceipt);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!receipt && id) {
+      setLoading(true);
+      supabase.from('receipts').select('*').eq('id', id).single()
+        .then(({ data, error }) => {
+          if (error || !data) setError('Failed to fetch receipt.');
+          else setReceipt(data);
+          setLoading(false);
+        });
+    }
+  }, [id, receipt]);
+
+  if (loading) return <div className="text-center p-8">Loading receipt...</div>;
+  if (error) return <div className="text-center text-red-600 p-8">{error}</div>;
+  if (!receipt) return <div className="text-center text-gray-500 p-8">Receipt not found.</div>;
 
   // Always use business info from localStorage if available
   let businessProfile: any = {};

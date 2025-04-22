@@ -8,16 +8,15 @@ import { MdLocalOffer } from 'react-icons/md';
 import { FaRegFileAlt } from 'react-icons/fa';
 import Link from 'next/link';
 import { FiDownload, FiUpload } from 'react-icons/fi';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function DashboardClient() {
   const [businessName, setBusinessName] = useState('');
   const [businessId, setBusinessId] = useState('');
   const fileInputRef = useState<any>(null);
-
+  const [recentReceipts, setRecentReceipts] = useState<any[]>([]);
   // Dashboard statistics (empty for live look)
   const dashboardStats: { title: string; value: string; icon: string }[] = [];
-  // Recent receipts (empty for live look)
-  const recentReceipts: { id: string; date: string; customer: string; amount: string }[] = [];
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -32,6 +31,19 @@ export default function DashboardClient() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!businessId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('*')
+        .eq('user_code', businessId)
+        .order('date', { ascending: false })
+        .limit(5);
+      if (data) setRecentReceipts(data);
+    })();
+  }, [businessId]);
 
   // Backup all localStorage data to a file
   function handleBackup() {
@@ -134,44 +146,41 @@ export default function DashboardClient() {
             ))}
           </div>
           {/* Recent Receipts */}
-          <div className="bg-white shadow rounded-lg p-6 mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-primary-800">Recent Receipts</h2>
-              <Link href="/recent-receipts" className="text-primary-600 hover:text-primary-900 font-medium">View All</Link>
-            </div>
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">Recent Receipts</h2>
             {recentReceipts.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-primary-100 text-primary-900">
+                  <thead>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Receipt #</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Customer</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Amount</th>
-                      <th className="px-6 py-3"></th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt #</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {recentReceipts.map((receipt, index) => (
-                      <tr key={index}>
+                  <tbody>
+                    {recentReceipts.map((receipt: any, index: number) => (
+                      <tr key={receipt.id || index}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {receipt.id}
+                          {receipt.receiptNumber || receipt.receipt_number || receipt.id}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {receipt.date}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {receipt.customer}
+                          {receipt.customerName || receipt.customer_name || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {receipt.amount}
+                          ₹{receipt.total || receipt.totalAmount || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-3">
-                            <Link href={`/receipts/${receipt.id}/view`} className="text-primary-600 hover:text-primary-900">
+                            <Link href={`/view-receipt/${receipt.id || receipt.receipt_id}`} className="text-primary-600 hover:text-primary-900">
                               View
                             </Link>
-                            <Link href={`/receipts/${receipt.id}/print`} className="text-gray-600 hover:text-gray-900">
+                            <Link href={`/view-receipt/${receipt.id || receipt.receipt_id}/print`} className="text-gray-600 hover:text-gray-900">
                               Print
                             </Link>
                           </div>

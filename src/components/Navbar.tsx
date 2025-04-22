@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface NavbarProps {
   isLoggedIn: boolean;
@@ -11,6 +11,20 @@ interface NavbarProps {
 const Navbar = ({ isLoggedIn, businessName }: NavbarProps) => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Fetch business name from localStorage if not provided
+  const [bizName, setBizName] = useState(businessName || '');
+  useEffect(() => {
+    if (!businessName && typeof window !== 'undefined') {
+      const saved = localStorage.getItem('businessInfo');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setBizName(parsed.businessName || parsed.name || 'Business User');
+        } catch {}
+      }
+    }
+  }, [businessName]);
 
   return (
     <nav className="bg-primary-500 text-white shadow-md">
@@ -35,7 +49,6 @@ const Navbar = ({ isLoggedIn, businessName }: NavbarProps) => {
             >
               Home
             </Link>
-            
             {isLoggedIn ? (
               <>
                 <Link 
@@ -47,15 +60,15 @@ const Navbar = ({ isLoggedIn, businessName }: NavbarProps) => {
                   Dashboard
                 </Link>
                 <Link 
-                  href="/create-bill" 
+                  href="/generate-receipt" 
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
-                    pathname === '/create-bill' ? 'bg-primary-700 text-white' : 'hover:bg-primary-600'
+                    pathname === '/generate-receipt' ? 'bg-primary-700 text-white' : 'hover:bg-primary-600'
                   }`}
                 >
-                  Create Bill
+                  Generate Receipt
                 </Link>
                 <div className="ml-4 flex items-center space-x-2">
-                  <span className="text-sm font-medium">{businessName || 'Business User'}</span>
+                  <span className="text-sm font-medium">{bizName || 'Business User'}</span>
                   <Link 
                     href="/profile" 
                     className="bg-primary-600 p-2 rounded-full hover:bg-primary-700"
@@ -140,12 +153,12 @@ const Navbar = ({ isLoggedIn, businessName }: NavbarProps) => {
                   Dashboard
                 </Link>
                 <Link 
-                  href="/create-bill" 
+                  href="/generate-receipt" 
                   className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    pathname === '/create-bill' ? 'bg-primary-700 text-white' : 'hover:bg-primary-600'
+                    pathname === '/generate-receipt' ? 'bg-primary-700 text-white' : 'hover:bg-primary-600'
                   }`}
                 >
-                  Create Bill
+                  Generate Receipt
                 </Link>
                 <Link 
                   href="/profile" 
