@@ -19,7 +19,6 @@ export default function DashboardPage() {
   const [businessId, setBusinessId] = useState('');
   const [recentReceipts, setRecentReceipts] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
-  const [recent, setRecent] = useState<any[]>([]);
   const [userCode, setUserCode] = useState('');
   const role = typeof window !== 'undefined' ? getUserRole() : undefined;
 
@@ -37,31 +36,22 @@ export default function DashboardPage() {
       setBusinessName(parsed?.businessName || 'Business User');
       setBusinessId(parsed?.businessId || '');
       setUserCode(localStorage.getItem('user_code') || parsed?.businessId || '');
-      // Load recent receipts from localStorage
-      const bizId = parsed?.businessId || '';
-      if (bizId) {
-        let receiptsArr: any[] = [];
-        try {
-          const receiptsRaw = localStorage.getItem(`receipts_${bizId}`);
-          if (receiptsRaw) receiptsArr = JSON.parse(receiptsRaw);
-        } catch {}
-        receiptsArr.sort((a: any, b: any) => {
-          const getTime = (r: any) => {
-            if (r.receiptUniqueId) {
-              const parts = r.receiptUniqueId.split('_');
-              if (parts.length >= 2 && !isNaN(Number(parts[1]))) return Number(parts[1]);
-            }
-            if (r.date && !isNaN(Date.parse(r.date))) return new Date(r.date).getTime();
-            if (r.createdAt && !isNaN(Date.parse(r.createdAt))) return new Date(r.createdAt).getTime();
-            if (r.created_at && !isNaN(Date.parse(r.created_at))) return new Date(r.created_at).getTime();
-            return 0;
-          };
-          return getTime(b) - getTime(a);
-        });
-        setRecentReceipts(receiptsArr.slice(0, 5));
-      }
     }
   }, [hasMounted]);
+
+  useEffect(() => {
+    const businessId = localStorage.getItem('businessId');
+    if (!businessId) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('*')
+        .eq('user_code', businessId)
+        .order('date', { ascending: false })
+        .limit(5);
+      if (data) setRecentReceipts(data);
+    })();
+  }, []);
 
   useEffect(() => {
     if (!userCode) return;
@@ -77,7 +67,6 @@ export default function DashboardPage() {
         customers: cc.data?.length || 0,
         totalSales: rc.data?.reduce((sum: number, r: any) => sum + (r.amount || 0), 0) || 0,
       });
-      setRecent(rc.data?.slice(-5).reverse() || []);
     }
     fetchStats();
   }, [userCode]);
@@ -88,9 +77,6 @@ export default function DashboardPage() {
       <span className="ml-4 text-lg">Loading...</span>
     </div>
   );
-
-  // Dashboard statistics (empty for live look)
-  const dashboardStats: { title: string; value: string; icon: string }[] = [];
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -156,50 +142,42 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {/* Dashboard Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-            {dashboardStats.map((stat, index) => (
-              <DashboardCard 
-                key={index}
-                title={stat.title}
-                value={stat.value}
-                icon={stat.icon}
-              />
-            ))}
-          </div>
-          
-          {/* Recent Receipts */}
-          <div className="bg-white shadow rounded-lg p-6 mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-primary-800">Recent Receipts</h2>
-              <Link href="/recent-receipts" className="text-primary-600 hover:text-primary-900 font-medium">View All</Link>
-            </div>
-            
+          {/* Recent Receipts Section */}
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">Recent Receipts</h2>
             {recentReceipts.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-primary-100 text-primary-900">
+                  <thead>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Receipt #</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Customer</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Amount</th>
-                      <th className="px-6 py-3"></th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt #</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {recentReceipts.map((receipt, index) => (
-                      <tr key={receipt.receiptUniqueId || receipt.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{receipt.receipt_number || receipt.receiptNumber || receipt.id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.date}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.customer || receipt.customerId || ''}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{Number(receipt.total || receipt.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  <tbody>
+                    {recentReceipts.map((receipt: any, index: number) => (
+                      <tr key={receipt.id || index}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {receipt.receiptNumber || receipt.receipt_number || receipt.id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {receipt.date}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {receipt.customerName || receipt.customer_name || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          ₹{receipt.total || receipt.totalAmount || '-'}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-3">
-                            <Link href={`/view-receipt/${receipt.receiptUniqueId || receipt.id}`} className="text-primary-600 hover:text-primary-900">
+                            <Link href={`/view-receipt/${receipt.id || receipt.receipt_id}`} className="text-primary-600 hover:text-primary-900">
                               View
                             </Link>
-                            <Link href={`/receipts/${receipt.receiptUniqueId || receipt.id}/print`} className="text-gray-600 hover:text-gray-900">
+                            <Link href={`/view-receipt/${receipt.id || receipt.receipt_id}/print`} className="text-gray-600 hover:text-gray-900">
                               Print
                             </Link>
                           </div>
@@ -215,69 +193,10 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          
-          {/* Quick Tips */}
-          <div className="bg-primary-50 border border-primary-100 rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-primary-800 mb-4">Tips for using Green Receipt</h2>
-            <div className="space-y-3">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-primary-700">Create a custom receipt template that matches your brand's style.</p>
-                </div>
-              </div>
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-primary-700">Add your most common products to speed up receipt creation.</p>
-                </div>
-              </div>
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-primary-700">Import your customer database to keep track of all customer interactions.</p>
-                </div>
-              </div>
-            </div>
-          </div>
           <RoleManager />
-          <h1 className="text-2xl font-bold mb-4">Analytics Dashboard</h1>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded shadow p-4"><div className="font-semibold">Receipts</div><div className="text-2xl">{stats.receipts}</div></div>
-            <div className="bg-white rounded shadow p-4"><div className="font-semibold">Products</div><div className="text-2xl">{stats.products}</div></div>
-            <div className="bg-white rounded shadow p-4"><div className="font-semibold">Customers</div><div className="text-2xl">{stats.customers}</div></div>
-            <div className="bg-white rounded shadow p-4"><div className="font-semibold">Total Sales</div><div className="text-2xl">₹{stats.totalSales}</div></div>
-          </div>
-          <h2 className="text-lg font-semibold mb-2">Recent Receipts</h2>
-          <table className="w-full border">
-            <thead><tr><th>ID</th><th>Customer</th><th>Date</th><th>Amount</th></tr></thead>
-            <tbody>
-              {recent.map(r => (
-                <tr key={r.id}>
-                  <td>{r.id}</td>
-                  <td>{r.customerName}</td>
-                  <td>{new Date(r.date).toLocaleDateString()}</td>
-                  <td>₹{r.amount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Footer />
         </div>
       </div>
-      
-      <Footer />
     </main>
   );
-} 
+}

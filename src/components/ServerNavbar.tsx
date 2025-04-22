@@ -29,10 +29,10 @@ const ServerNavbar = ({ isLoggedIn = false, businessName }: ServerNavbarProps) =
               Create Bill Design
             </Link>
             <Link 
-              href="/recent-receipts" 
+              href="/generate-receipt" 
               className="px-3 py-2 rounded-md text-sm font-medium hover:bg-primary-600"
             >
-              Recent Receipts
+              Generate Receipt
             </Link>
             <div className="ml-4 flex items-center space-x-2">
               {/* Hydration-safe business name display */}
@@ -61,7 +61,7 @@ function BusinessNameDisplay({ businessName }: { businessName?: string }) {
       if (info) {
         try {
           const parsed = JSON.parse(info);
-          setName(parsed.businessName || "");
+          setName(parsed.businessName || parsed.name || "");
         } catch {}
       }
     }

@@ -6,6 +6,7 @@ import Head from "next/head";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import ReceiptView from "./ReceiptView";
+import { supabase } from '@/lib/supabaseClient';
 
 export default function ViewReceiptPage() {
   const { id } = useParams();
@@ -13,33 +14,30 @@ export default function ViewReceiptPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Try to fetch from backend
-    fetch("http://localhost:3000/api/receipts")
-      .then((res) => res.json())
-      .then((data) => {
-        const found = Array.isArray(data)
-          ? data.find(
-              (r) => r.qrCode === id || r.receiptUniqueId === id || r._id === id
-            )
-          : null;
-        if (found) {
-          // Patch businessInfo with profile info if missing/incorrect
-          let businessInfo = found.businessInfo || {};
-          if (typeof window !== "undefined") {
-            const profile = localStorage.getItem("businessInfo");
+    if (!id) return;
+    supabase
+      .from('receipts')
+      .select('*')
+      .or(`qrCode.eq.${id},receiptUniqueId.eq.${id},id.eq.${id}`)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          setError('Receipt not found');
+        } else {
+          let businessInfo = data.businessInfo || {};
+          if (typeof window !== 'undefined') {
+            const profile = localStorage.getItem('businessInfo');
             if (profile) {
               try {
                 const parsed = JSON.parse(profile);
-                // Only override name/id if missing or placeholder
-                if (!businessInfo.name || businessInfo.name === "Business Name") businessInfo.name = parsed.businessName || parsed.name;
+                if (!businessInfo.name || businessInfo.name === 'Business Name') businessInfo.name = parsed.businessName || parsed.name;
                 if (!businessInfo.businessId) businessInfo.businessId = parsed.businessId;
               } catch {}
             }
           }
-          setReceipt({ ...found, businessInfo });
-        } else setError("Receipt not found");
-      })
-      .catch(() => setError("Failed to fetch receipt"));
+          setReceipt({ ...data, businessInfo });
+        }
+      });
   }, [id]);
 
   function handleDownloadPDF() {

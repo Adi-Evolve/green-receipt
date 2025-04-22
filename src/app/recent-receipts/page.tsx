@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import ServerNavbar from '@/components/ServerNavbar';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function RecentReceiptsPage() {
   const [receipts, setReceipts] = useState<any[]>([]);
@@ -22,20 +23,20 @@ export default function RecentReceiptsPage() {
     }
     setLoading(true);
     setError(null);
-    try {
-      // Get receipts from localStorage
-      const localReceipts = localStorage.getItem(`receipts_${businessId}`);
-      let receiptsArr = [];
-      if (localReceipts) {
-        try { receiptsArr = JSON.parse(localReceipts); } catch { receiptsArr = []; }
-      }
-      setReceipts(receiptsArr);
-      // Optionally, fetch customers from localStorage or API if needed
-    } catch (err) {
-      setError('Failed to load receipts');
-    } finally {
-      setLoading(false);
-    }
+    supabase
+      .from('receipts')
+      .select('*')
+      .eq('user_code', businessId)
+      .order('date', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setError('Failed to load receipts');
+          setReceipts([]);
+        } else {
+          setReceipts(data || []);
+        }
+        setLoading(false);
+      });
   }, []);
 
   const filteredReceipts = receipts.filter(receipt => {
