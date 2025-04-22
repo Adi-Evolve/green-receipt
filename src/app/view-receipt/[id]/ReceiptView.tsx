@@ -92,6 +92,13 @@ export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?:
       </div>
       {/* Products Table */}
       <div className="px-8 py-4">
+        {/* Debug: Show products array */}
+        {(!receipt.products || receipt.products.length === 0) && (
+          <div className="mb-2 text-red-600 text-xs">No products found for this receipt.</div>
+        )}
+        {process.env.NODE_ENV !== 'production' && (
+          <pre className="bg-gray-100 text-xs p-2 mb-2 rounded overflow-x-auto">{JSON.stringify(receipt.products, null, 2)}</pre>
+        )}
         <table className="w-full text-sm border">
           <thead>
             <tr className="bg-gray-100">
@@ -105,7 +112,7 @@ export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?:
               <tr key={idx} className="border-b">
                 {columnOrder.map((col) => {
                   if (col === "serial") return <td key={col} className="px-3 py-1">{idx + 1}</td>;
-                  if (col === "product") return <td key={col} className="px-3 py-1">{p.name}</td>;
+                  if (col === "product") return <td key={col} className="px-3 py-1">{p.name || p.productName}</td>;
                   if (col === "quantity") return <td key={col} className="px-3 py-1">{p.quantity}</td>;
                   if (col === "gst") return <td key={col} className="px-3 py-1">{p.gst}</td>;
                   if (col === "price") return <td key={col} className="px-3 py-1">{p.price}</td>;
