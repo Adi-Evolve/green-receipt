@@ -27,7 +27,7 @@ export default function RecentReceiptsPage() {
       .from('receipts')
       .select('*')
       .eq('user_code', businessId)
-      .order('date', { ascending: false })
+      .order('date', { ascending: sortOrder === 'asc' })
       .then(({ data, error }) => {
         if (error) {
           setError('Failed to load receipts');
@@ -37,7 +37,7 @@ export default function RecentReceiptsPage() {
         }
         setLoading(false);
       });
-  }, []);
+  }, [sortOrder]);
 
   useEffect(() => {
     async function fetchCustomers() {

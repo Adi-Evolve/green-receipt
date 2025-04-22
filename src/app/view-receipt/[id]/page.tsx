@@ -30,15 +30,22 @@ export default function ViewReceiptPage() {
       if (error || !data) {
         setError('Receipt not found');
       } else {
+        // --- Fetch business info from DB using user_code ---
         let businessInfo = data.businessInfo || {};
-        if (typeof window !== 'undefined') {
-          const profile = localStorage.getItem('businessInfo');
-          if (profile) {
-            try {
-              const parsed = JSON.parse(profile);
-              if (!businessInfo.name || businessInfo.name === 'Business Name') businessInfo.name = parsed.businessName || parsed.name;
-              if (!businessInfo.businessId) businessInfo.businessId = parsed.businessId;
-            } catch {}
+        let userCode = data.user_code || data.businessId || data.business_id || '';
+        if (userCode) {
+          const { data: bizData } = await supabase.from('businesses').select('*').eq('businessId', userCode).maybeSingle();
+          if (bizData) {
+            businessInfo = {
+              ...businessInfo,
+              ...bizData,
+              name: bizData.businessName || bizData.name || businessInfo.name,
+              businessId: bizData.businessId || businessInfo.businessId,
+              logoUrl: bizData.logoUrl || businessInfo.logoUrl,
+              address: bizData.address || businessInfo.address,
+              phone: bizData.phone || businessInfo.phone,
+              email: bizData.email || businessInfo.email,
+            };
           }
         }
         // Always ensure products is an array (parse if string)

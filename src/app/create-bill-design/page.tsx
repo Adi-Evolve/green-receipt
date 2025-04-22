@@ -30,6 +30,7 @@ const DEFAULT_FORMAT: BillDesign = {
       customerInfo: true,
       termsAndConditions: true,
       warranty: false,
+      returnPeriod: false,
       qrCode: true,
       signature: false,
       notes: false

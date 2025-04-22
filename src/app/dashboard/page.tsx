@@ -10,6 +10,7 @@ import { FaRegFileAlt } from 'react-icons/fa';
 import NotificationBell from '../components/NotificationBell';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import CustomerAnalytics from './components/CustomerAnalytics'; // Import the CustomerAnalytics component
 
 export default function DashboardPage() {
   // All hooks must be at the top, before any return
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any>({});
   const [userCode, setUserCode] = useState('');
   const [customers, setCustomers] = useState<Record<string, string>>({});
+  const [showCustomerAnalytics, setShowCustomerAnalytics] = useState(false); // Add a state to show/hide the customer analytics modal
 
   useEffect(() => { setHasMounted(true); }, []);
 
@@ -59,9 +61,25 @@ export default function DashboardPage() {
         .eq('user_code', businessId)
         .order('date', { ascending: false })
         .limit(5);
-      if (data) setRecentReceipts(data);
+      if (data) {
+        setRecentReceipts((prev: any[]) => {
+          return [...prev].sort((a, b) => {
+            const getTime = (r: any) => {
+              if (r.receiptUniqueId) {
+                const parts = r.receiptUniqueId.split('_');
+                if (parts.length >= 2 && !isNaN(Number(parts[1]))) return Number(parts[1]);
+              }
+              if (r.date && !isNaN(Date.parse(r.date))) return new Date(r.date).getTime();
+              if (r.createdAt && !isNaN(Date.parse(r.createdAt))) return new Date(r.createdAt).getTime();
+              if (r.created_at && !isNaN(Date.parse(r.created_at))) return new Date(r.created_at).getTime();
+              return 0;
+            };
+            return getTime(b) - getTime(a); // Descending order (latest first)
+          });
+        });
+      }
     })();
-  }, []);
+  }, [recentReceipts.length]);
 
   useEffect(() => {
     if (!userCode) return;
@@ -180,7 +198,15 @@ export default function DashboardPage() {
 
           {/* Recent Receipts Section */}
           <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Recent Receipts</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Recent Receipts</h2>
+              <button
+                className="btn-secondary"
+                onClick={() => setShowCustomerAnalytics(true)}
+              >
+                Customer Analytics
+              </button>
+            </div>
             {recentReceipts.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -243,6 +269,16 @@ export default function DashboardPage() {
           <Footer />
         </div>
       </div>
+      {/* Customer Analytics Modal */}
+      {showCustomerAnalytics && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl w-full relative">
+            <button className="absolute top-2 right-2 text-gray-600" onClick={() => setShowCustomerAnalytics(false)}>&times;</button>
+            <h3 className="text-lg font-bold mb-2">Customer Analytics</h3>
+            <CustomerAnalytics receipts={recentReceipts} />
+          </div>
+        </div>
+      )}
     </main>
   );
 }

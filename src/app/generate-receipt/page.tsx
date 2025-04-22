@@ -34,6 +34,7 @@ interface ReceiptFormat {
     customerInfo: boolean;
     termsAndConditions: boolean;
     warranty: boolean;
+    returnPeriod: boolean;
     qrCode: boolean;
     signature?: boolean;
     notes?: boolean;
@@ -71,6 +72,7 @@ const defaultFormat: ReceiptFormat = {
     customerInfo: true,
     termsAndConditions: false, // hide from receipt form
     warranty: true,
+    returnPeriod: true,
     qrCode: true,
   },
 };
@@ -115,6 +117,8 @@ export default function GenerateReceiptPage() {
     gst: '',
   });
   const [addingCustomer, setAddingCustomer] = useState(false);
+  const [paidChecked, setPaidChecked] = useState(false);
+  const [paidAmountInput, setPaidAmountInput] = useState('');
 
   useEffect(() => {
     setHasMounted(true);
@@ -148,7 +152,7 @@ export default function GenerateReceiptPage() {
       if (all.length === 0) {
         setFormat({
           columns: { product: true, quantity: true, gst: true, price: true, amount: true },
-          elements: { logo: true, businessInfo: true, customerInfo: true, termsAndConditions: false, warranty: true, qrCode: true },
+          elements: { logo: true, businessInfo: true, customerInfo: true, termsAndConditions: false, warranty: true, returnPeriod: true, qrCode: true },
         });
       }
       setProducts([{ id: '1', name: '', price: 0, quantity: 1, gst: 0, amount: 0 }]);
@@ -235,6 +239,8 @@ export default function GenerateReceiptPage() {
             setWarranty(draft.warranty || '');
             setReturnDays(draft.returnDays || '');
             setReceiptNumber(draft.receiptNumber || '');
+            setPaidChecked(draft.amount_paid === draft.total);
+            setPaidAmountInput(draft.amount_paid || '');
           } catch {}
         }
       }
@@ -394,6 +400,18 @@ export default function GenerateReceiptPage() {
       return;
     }
     const receiptUniqueId = `${bizId}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    // Payment logic
+    let amountPaid = 0;
+    let amountRemaining = total;
+    if (paidChecked) {
+      if (paidAmountInput === '' || paidAmountInput === null || paidAmountInput === undefined) {
+        amountPaid = total;
+        amountRemaining = 0;
+      } else {
+        amountPaid = Math.min(Number(paidAmountInput), total);
+        amountRemaining = Math.max(total - amountPaid, 0);
+      }
+    }
     const receiptData = {
       user_code: bizId,
       receipt_number: receiptNumber,
@@ -402,13 +420,15 @@ export default function GenerateReceiptPage() {
       total,
       date,
       terms: businessInfo.terms || '',
-      warranty,
-      return_days: returnDays,
+      warranty: format?.elements?.warranty ? warranty : '',
+      return_period: format?.elements?.returnPeriod ? returnDays : '',
       format_name: selectedFormatName,
       format_design: JSON.stringify(format),
       qr_code: receiptUniqueId,
       draft: false,
       receipt_id: receiptUniqueId,
+      amount_paid: amountPaid,
+      amount_remaining: amountRemaining,
     };
     try {
       const { error } = await supabase.from('receipts').insert([receiptData]);
@@ -433,6 +453,18 @@ export default function GenerateReceiptPage() {
       return;
     }
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
+    // Payment logic
+    let amountPaid = 0;
+    let amountRemaining = total;
+    if (paidChecked) {
+      if (paidAmountInput === '' || paidAmountInput === null || paidAmountInput === undefined) {
+        amountPaid = total;
+        amountRemaining = 0;
+      } else {
+        amountPaid = Math.min(Number(paidAmountInput), total);
+        amountRemaining = Math.max(total - amountPaid, 0);
+      }
+    }
     const draftUniqueId = `${businessInfo.businessId || (businessInfo as any).user_code}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const draftData = {
       businessId: businessInfo.businessId || (businessInfo as any).user_code,
@@ -442,13 +474,15 @@ export default function GenerateReceiptPage() {
       total,
       date,
       terms: businessInfo.terms || '',
-      warranty,
-      returnDays,
+      warranty: format?.elements?.warranty ? warranty : '',
+      returnDays: format?.elements?.returnPeriod ? returnDays : '',
       formatName: selectedFormatName,
       formatDesign: format,
       qrCode: draftUniqueId,
       draft: true,
       draftId: draftUniqueId,
+      amountPaid,
+      amountRemaining,
     };
     try {
       const allDraftsKey = `drafts_${businessInfo.businessId || (businessInfo as any).user_code}`;
@@ -696,16 +730,39 @@ export default function GenerateReceiptPage() {
                 <div className="text-lg font-bold">Total: ₹{total.toFixed(2)}</div>
               </div>
             </div>
-            {format.elements.warranty && (
+            {/* Payment Section */}
+            <div className="mt-6 mb-4">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={paidChecked} onChange={e => setPaidChecked(e.target.checked)} /> Paid
+              </label>
+              {paidChecked && (
+                <div className="mt-2 flex gap-2 items-center">
+                  <input
+                    type="number"
+                    min={0}
+                    max={total}
+                    value={paidAmountInput}
+                    onChange={e => setPaidAmountInput(e.target.value)}
+                    placeholder="Enter amount paid (leave blank for full payment)"
+                    className="border border-gray-300 rounded px-3 py-2 w-64"
+                  />
+                </div>
+              )}
+            </div>
+            {(format?.elements?.warranty || format?.elements?.returnPeriod) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-medium mb-1">Warranty (days)</label>
-                  <input type="number" value={warranty} onChange={e => setWarranty(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2" />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Return Period (days)</label>
-                  <input type="number" value={returnDays} onChange={e => setReturnDays(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2" />
-                </div>
+                {format?.elements?.warranty && (
+                  <div>
+                    <label className="block font-medium mb-1">Warranty (days)</label>
+                    <input type="number" value={warranty} onChange={e => setWarranty(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2" />
+                  </div>
+                )}
+                {format?.elements?.returnPeriod && (
+                  <div>
+                    <label className="block font-medium mb-1">Return Period (days)</label>
+                    <input type="number" value={returnDays} onChange={e => setReturnDays(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2" />
+                  </div>
+                )}
               </div>
             )}
             {format.elements.qrCode && (
