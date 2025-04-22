@@ -41,7 +41,7 @@ export default function ViewReceiptPage() {
             } catch {}
           }
         }
-        setReceipt({ ...data, businessInfo });
+        setReceipt({ ...data, businessInfo, products: Array.isArray(data.products) ? data.products : [] });
       }
     })();
   }, [id]);

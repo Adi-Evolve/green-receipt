@@ -187,8 +187,8 @@ export default function AddCustomerPage() {
               )}
             </div>
           )}
-          <input type="file" accept=".csv,.xlsx" onChange={handleImportCustomers} className="mb-2" />
-          <span className="text-xs text-gray-500">Import CSV/Excel (Tally, etc)</span>
+          <input type="file" accept=".csv,.xlsx" onChange={handleImportCustomers} className="mb-2 file:bg-primary-100 file:text-primary-700 file:rounded file:border-0 file:px-4 file:py-2 file:mr-4 file:cursor-pointer" />
+          <span className="text-xs text-primary-700">Import CSV/Excel (Tally, etc)</span>
         </div>
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-2">Your Customers</h2>

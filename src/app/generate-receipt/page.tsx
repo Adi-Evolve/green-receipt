@@ -106,6 +106,15 @@ export default function GenerateReceiptPage() {
   const [allFormats, setAllFormats] = useState<{ name: string; designData: ReceiptFormat }[]>([]);
   const [selectedFormatName, setSelectedFormatName] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    gst: '',
+  });
+  const [addingCustomer, setAddingCustomer] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -160,7 +169,7 @@ export default function GenerateReceiptPage() {
       setReceiptNumber(`GR-${bizId}-${serial}`);
       setDate(new Date().toISOString().split('T')[0]);
       (async () => {
-        const { data } = await supabase.from('customers').select('*').eq('user_code', bizId);
+        const { data, error } = await supabase.from('customers').select('*').eq('user_code', bizId);
         if (data) setCustomers(data);
       })();
       let loaded = false;
@@ -304,6 +313,37 @@ export default function GenerateReceiptPage() {
     setCustomerSuggestions([]);
     setSelectedCustomer(cust);
     // Optionally, autofill other customer fields if needed
+  };
+
+  const handleNewCustomerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewCustomer(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const addNewCustomer = async () => {
+    setAddingCustomer(true);
+    try {
+      const { data, error } = await supabase.from('customers').insert([newCustomer]);
+      if (error) throw error;
+      // Defensive: data may be null or not an array, so check type
+      const inserted = Array.isArray(data) ? data[0] : (data ? data : null);
+      if (inserted) {
+        setCustomers(prev => [...prev, inserted]);
+        setCustomerId((inserted as any).customerId || (inserted as any).name);
+        setSelectedCustomer(inserted);
+      }
+      setShowNewCustomer(false);
+      setNewCustomer({
+        name: '',
+        phone: '',
+        email: '',
+        address: '',
+        gst: '',
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setAddingCustomer(false);
+    }
   };
 
   // Product autofill: Suggestion dropdown and autofill fields
@@ -469,43 +509,128 @@ export default function GenerateReceiptPage() {
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2" />
               </div>
             </div>
-            <div>
-              <label className="block font-medium mb-1">Customer ID</label>
-              <div className="relative">
+            <div className="mt-6 mb-4 flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <label htmlFor="customerId" className="block text-sm font-medium text-gray-700">Customer Name / ID</label>
                 <input
                   type="text"
+                  name="customerId"
+                  id="customerId"
                   value={customerId}
                   onChange={handleCustomerIdChange}
-                  className="border border-gray-300 rounded px-2 py-1 w-full"
-                  required
+                  className="input-field"
                   autoComplete="off"
                 />
-                {customerSuggestions.length > 0 && (
-                  <ul className="absolute bg-white border border-gray-300 rounded shadow z-10 w-full max-h-32 overflow-y-auto">
-                    {customerSuggestions.map((cust, i) => (
-                      <li
-                        key={cust.customerId || cust.name || i}
-                        className="px-2 py-1 hover:bg-primary-100 cursor-pointer"
-                        onClick={() => handleSelectCustomerSuggestion(cust)}
-                      >
-                        {cust.name} {cust.customerId ? `(${cust.customerId})` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
-              {/* Autofill customer details below when selected */}
-              {selectedCustomer && (
-                <div className="mt-2 text-sm text-gray-700 space-y-1">
-                  {selectedCustomer.customerId && <div><b>ID:</b> {selectedCustomer.customerId}</div>}
-                  {selectedCustomer.phone && <div><b>Phone:</b> {selectedCustomer.phone}</div>}
-                  {selectedCustomer.email && <div><b>Email:</b> {selectedCustomer.email}</div>}
-                  {selectedCustomer.address && <div><b>Address:</b> {selectedCustomer.address}</div>}
-                  {selectedCustomer.dob && <div><b>DOB:</b> {selectedCustomer.dob}</div>}
-                  {selectedCustomer.notes && <div><b>Notes:</b> {selectedCustomer.notes}</div>}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowNewCustomer(true)}
+                className="bg-primary-100 text-primary-700 px-4 py-2 rounded-md hover:bg-primary-200 transition-colors mt-6 sm:mt-0"
+              >
+                + New Customer
+              </button>
             </div>
+            {customerSuggestions.length > 0 && (
+              <ul className="absolute bg-white border border-gray-300 rounded shadow z-10 w-full max-h-32 overflow-y-auto">
+                {customerSuggestions.map((cust, i) => (
+                  <li
+                    key={cust.customerId || cust.name || i}
+                    className="px-2 py-1 hover:bg-primary-100 cursor-pointer"
+                    onClick={() => handleSelectCustomerSuggestion(cust)}
+                  >
+                    {cust.name} {cust.customerId ? `(${cust.customerId})` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/* Autofill customer details below when selected */}
+            {selectedCustomer && (
+              <div className="mt-2 text-sm text-gray-700 space-y-1">
+                {selectedCustomer.customerId && <div><b>ID:</b> {selectedCustomer.customerId}</div>}
+                {selectedCustomer.phone && <div><b>Phone:</b> {selectedCustomer.phone}</div>}
+                {selectedCustomer.email && <div><b>Email:</b> {selectedCustomer.email}</div>}
+                {selectedCustomer.address && <div><b>Address:</b> {selectedCustomer.address}</div>}
+                {selectedCustomer.dob && <div><b>DOB:</b> {selectedCustomer.dob}</div>}
+                {selectedCustomer.notes && <div><b>Notes:</b> {selectedCustomer.notes}</div>}
+              </div>
+            )}
+            {showNewCustomer && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+                <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative">
+                  <button
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl"
+                    onClick={() => setShowNewCustomer(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                  <h2 className="text-lg font-semibold mb-4 text-primary-700">Add New Customer</h2>
+                  <form
+                    onSubmit={e => { e.preventDefault(); addNewCustomer(); }}
+                    className="space-y-3"
+                  >
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Name<span className="text-red-500">*</span></label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={newCustomer.name}
+                        onChange={handleNewCustomerChange}
+                        className="input-field"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Phone</label>
+                      <input
+                        type="text"
+                        name="phone"
+                        value={newCustomer.phone}
+                        onChange={handleNewCustomerChange}
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Email</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={newCustomer.email}
+                        onChange={handleNewCustomerChange}
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Address</label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={newCustomer.address}
+                        onChange={handleNewCustomerChange}
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">GST</label>
+                      <input
+                        type="text"
+                        name="gst"
+                        value={newCustomer.gst}
+                        onChange={handleNewCustomerChange}
+                        className="input-field"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-primary-500 text-white py-2 rounded-md hover:bg-primary-600 transition-colors"
+                      disabled={addingCustomer}
+                    >
+                      {addingCustomer ? 'Adding...' : 'Add Customer'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
             <div>
               <label className="block font-medium mb-1">Products</label>
               <table className="min-w-full border border-gray-300 rounded">
