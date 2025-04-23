@@ -94,7 +94,10 @@ export default function GenerateReceiptPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [customerId, setCustomerId] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
   const [warranty, setWarranty] = useState('');
   const [returnDays, setReturnDays] = useState('');
   const [qrValue, setQrValue] = useState('');
