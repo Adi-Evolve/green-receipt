@@ -167,22 +167,23 @@ export default function DashboardPage() {
             {alert}
           </div>
         )}
-        <h1 className="text-3xl font-bold mb-8 text-primary-700">Business Management Dashboard</h1>
+        <h1 className="text-3xl font-bold mb-2 text-[#017a5a]">Dashboard</h1>
+        <div className="text-sm text-gray-600 mb-8">Welcome to Green Receipt business portal, your business ID is: <span className="font-mono text-[#008c7e]">{businessId}</span></div>
         {/* Main Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-8">
-          <Link href="/generate-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-600 text-white hover:bg-green-700 transition-colors text-lg flex-1 text-center">
-            Generate Receipt
+          <Link href="/recent-receipts" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#017a5a] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
+            Recent Receipts
           </Link>
-          <Link href="/view-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-600 text-white hover:bg-green-700 transition-colors text-lg flex-1 text-center">
-            View Receipts
+          <Link href="/generate-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#017a5a] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
+            Generate Receipt
           </Link>
         </div>
         {/* Secondary Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-8">
-          <Link href="/dashboard/inventory-management" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-900 text-white hover:bg-green-800 transition-colors text-lg flex-1 text-center">
+          <Link href="/dashboard/inventory-management" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Inventory Management
           </Link>
-          <Link href="/dashboard/customer-analytics" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-900 text-white hover:bg-green-800 transition-colors text-lg flex-1 text-center">
+          <Link href="/dashboard/customer-analytics" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Customer Analysis
           </Link>
         </div>
@@ -205,10 +206,12 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredReceipts.map((receipt: any) => (
+                {filteredReceipts.map((receipt: any, idx: number) => (
                   <tr key={receipt.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{receipt.receiptNumber || receipt.id}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.customerName || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {`gr-${businessId}-${idx+1}`}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.customerName || receipt.customer_name || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.date}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{receipt.total || '-'}</td>
                   </tr>
