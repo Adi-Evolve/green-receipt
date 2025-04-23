@@ -221,8 +221,8 @@ export default function GenerateReceiptPage() {
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format && format.columns && format.columns.gst ? (1 + p.gst/100) : 1), 0);
     setQrValue(JSON.stringify({
       receiptNumber,
-      businessId: businessInfo.businessId || (businessInfo as any).user_code,
-      businessName: businessInfo.name,
+      businessId: businessInfo?.businessId || (businessInfo as any)?.user_code,
+      businessName: businessInfo?.name,
       customerId,
       products,
       total,
@@ -447,7 +447,7 @@ export default function GenerateReceiptPage() {
     }
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
     // Generate a unique code for this receipt (for QR and DB lookup)
-    const bizId = businessInfo.businessId || (businessInfo as any).user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
+    const bizId = businessInfo?.businessId || (businessInfo as any)?.user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
     if (!bizId) {
       setSaveError('Business ID missing. Please reload the page or log in again.');
       setSaving(false);
@@ -473,7 +473,7 @@ export default function GenerateReceiptPage() {
       products: JSON.stringify(products),
       total,
       date,
-      terms: businessInfo.terms || '',
+      terms: businessInfo?.terms || '',
       warranty: format?.elements?.warranty ? warranty : '',
       return_period: format?.elements?.returnPeriod ? returnDays : '',
       format_name: selectedFormatName,
@@ -503,7 +503,7 @@ export default function GenerateReceiptPage() {
   }
 
   async function updateInventoryAfterSale(products: Product[]) {
-    const bizId = businessInfo.businessId || (businessInfo as any).user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
+    const bizId = businessInfo?.businessId || (businessInfo as any)?.user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
     if (!bizId) return;
     const updates: any[] = [];
     products.forEach((p: Product) => {
@@ -542,15 +542,15 @@ export default function GenerateReceiptPage() {
         amountRemaining = Math.max(total - amountPaid, 0);
       }
     }
-    const draftUniqueId = `${businessInfo.businessId || (businessInfo as any).user_code}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const draftUniqueId = `${businessInfo?.businessId || (businessInfo as any)?.user_code}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const draftData = {
-      businessId: businessInfo.businessId || (businessInfo as any).user_code,
+      businessId: businessInfo?.businessId || (businessInfo as any)?.user_code,
       receiptNumber,
       customerId,
       products,
       total,
       date,
-      terms: businessInfo.terms || '',
+      terms: businessInfo?.terms || '',
       warranty: format?.elements?.warranty ? warranty : '',
       returnDays: format?.elements?.returnPeriod ? returnDays : '',
       formatName: selectedFormatName,
@@ -562,7 +562,7 @@ export default function GenerateReceiptPage() {
       amountRemaining,
     };
     try {
-      const allDraftsKey = `drafts_${businessInfo.businessId || (businessInfo as any).user_code}`;
+      const allDraftsKey = `drafts_${businessInfo?.businessId || (businessInfo as any)?.user_code}`;
       let allDrafts = [];
       const existing = localStorage.getItem(allDraftsKey);
       if (existing) {
