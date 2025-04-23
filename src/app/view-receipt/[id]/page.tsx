@@ -4,9 +4,15 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Head from "next/head";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import ReceiptView from "./ReceiptView";
 import { supabase } from '@/lib/supabaseClient';
+
+// Attach autoTable to jsPDF prototype if not already attached (for Next.js/Vercel)
+if (typeof window !== "undefined" && autoTable) {
+  // @ts-ignore
+  jsPDF.prototype.autoTable = autoTable;
+}
 
 export default function ViewReceiptPage() {
   const { id } = useParams();
