@@ -397,6 +397,11 @@ export default function GenerateReceiptPage() {
       setSaving(false);
       return;
     }
+    if (!date) {
+      setSaveError('Please select a date for the receipt.');
+      setSaving(false);
+      return;
+    }
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
     // Generate a unique code for this receipt (for QR and DB lookup)
     const bizId = businessInfo.businessId || (businessInfo as any).user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
