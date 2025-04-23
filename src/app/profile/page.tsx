@@ -174,6 +174,10 @@ export default function ProfilePage() {
     reader.readAsText(file);
   }
 
+  function handleExportCSVZip() {
+    // Implement CSV/ZIP export logic here
+  }
+
   const backupImportPanel = (
     <div className="flex justify-center gap-4 my-8">
       <button
@@ -181,13 +185,20 @@ export default function ProfilePage() {
         className="btn-secondary border border-primary-600 text-primary-700 bg-white hover:bg-primary-50 px-6 py-2 rounded font-semibold shadow-sm transition"
         onClick={handleBackup}
       >
-        Backup Data
+        Export Backup (JSON)
+      </button>
+      <button
+        type="button"
+        className="btn-secondary border border-primary-600 text-primary-700 bg-white hover:bg-primary-50 px-6 py-2 rounded font-semibold shadow-sm transition"
+        onClick={() => handleExportCSVZip()}
+      >
+        Export (CSV/ZIP)
       </button>
       <label
         className="btn-secondary border border-green-600 text-green-700 bg-white hover:bg-green-50 px-6 py-2 rounded font-semibold shadow-sm transition cursor-pointer"
         style={{marginBottom:0}}
       >
-        Import Backup
+        Import/Restore Backup
         <input type="file" accept="application/json" style={{display:'none'}} onChange={handleImportBackup} />
       </label>
     </div>

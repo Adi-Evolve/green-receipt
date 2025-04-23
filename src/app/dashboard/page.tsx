@@ -28,7 +28,6 @@ export default function DashboardPage() {
   const [showCustomerAnalytics, setShowCustomerAnalytics] = useState(false); // Add a state to show/hide the customer analytics modal
   const [alert, setAlert] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
@@ -143,88 +142,10 @@ export default function DashboardPage() {
     });
   }, [recentReceipts]);
 
-  // Backup: Export all business data (customers, products, receipts) as JSON or CSV
-  async function handleExportBackup(format: 'json' | 'csv') {
-    const businessId = typeof window !== 'undefined' ? localStorage.getItem('businessId') : '';
-    // Fetch from localStorage
-    const localCustomers = JSON.parse(localStorage.getItem(`customers_${businessId}`) || '[]');
-    const localProducts = JSON.parse(localStorage.getItem(`products_${businessId}`) || '[]');
-    const localReceipts = JSON.parse(localStorage.getItem(`receipts_${businessId}`) || '[]');
-    // Fetch from Supabase
-    const { data: dbCustomers } = await supabase.from('customers').select('*').eq('businessId', businessId);
-    const { data: dbProducts } = await supabase.from('products').select('*').eq('businessId', businessId);
-    const { data: dbReceipts } = await supabase.from('receipts').select('*').eq('businessId', businessId);
-    // Merge and dedupe by id/email/sku
-    const customers = [...localCustomers, ...(dbCustomers || [])].filter((c, i, arr) => arr.findIndex(x => x.email && c.email && x.email === c.email) === i);
-    const products = [...localProducts, ...(dbProducts || [])].filter((p, i, arr) => arr.findIndex(x => (x.sku || x.id) && (p.sku || p.id) && (x.sku || p.id) === (p.sku || p.id)) === i);
-    const receipts = [...localReceipts, ...(dbReceipts || [])].filter((r, i, arr) => arr.findIndex(x => x.id && r.id && x.id === r.id) === i);
-    const backup = { customers, products, receipts };
-    if (format === 'json') {
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'business-backup.json';
-      a.click();
-    } else {
-      // CSV: create 3 CSVs and zip if needed
-      const customersCSV = Papa.unparse(customers);
-      const productsCSV = Papa.unparse(products);
-      const receiptsCSV = Papa.unparse(receipts);
-      const zip = new JSZip();
-      zip.file('customers.csv', customersCSV);
-      zip.file('products.csv', productsCSV);
-      zip.file('receipts.csv', receiptsCSV);
-      zip.generateAsync({ type: 'blob' }).then(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'business-backup.zip';
-        a.click();
-      });
-    }
-  }
-
-  // Restore: Import backup JSON
-  async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const backup = JSON.parse(event.target?.result as string);
-        // Restore to localStorage and Supabase
-        const businessId = typeof window !== 'undefined' ? localStorage.getItem('businessId') : '';
-        if (backup.customers) {
-          localStorage.setItem(`customers_${businessId}`, JSON.stringify(backup.customers));
-          for (const c of backup.customers) {
-            await supabase.from('customers').upsert({ ...c, businessId });
-          }
-        }
-        if (backup.products) {
-          localStorage.setItem(`products_${businessId}`, JSON.stringify(backup.products));
-          for (const p of backup.products) {
-            await supabase.from('products').upsert({ ...p, businessId });
-          }
-        }
-        if (backup.receipts) {
-          localStorage.setItem(`receipts_${businessId}`, JSON.stringify(backup.receipts));
-          for (const r of backup.receipts) {
-            await supabase.from('receipts').upsert({ ...r, businessId });
-          }
-        }
-        setAlert('Backup restored successfully!');
-      } catch (err) {
-        setAlert('Failed to restore backup: ' + (err instanceof Error ? err.message : 'Unknown error'));
-      }
-    };
-    reader.readAsText(file);
-  }
-
   // Advanced Search & Filtering (example for receipts)
   const filteredReceipts = recentReceipts.filter(receipt => {
     const matchesQuery = searchQuery === '' || (receipt.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || receipt.id?.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesDate = (!filterDateFrom || new Date(receipt.date) >= new Date(filterDateFrom)) && (!filterDateTo || new Date(receipt.date) <= new Date(filterDateTo));
+    const matchesDate = (!filterDateTo || new Date(receipt.date) <= new Date(filterDateTo));
     const matchesAmount = (!filterAmountMin || (receipt.total || 0) >= Number(filterAmountMin)) && (!filterAmountMax || (receipt.total || 0) <= Number(filterAmountMax));
     return matchesQuery && matchesDate && matchesAmount;
   });
@@ -247,54 +168,28 @@ export default function DashboardPage() {
           </div>
         )}
         <h1 className="text-3xl font-bold mb-8 text-primary-700">Business Management Dashboard</h1>
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button className="btn-primary" onClick={() => handleExportBackup('json')}>Export Backup (JSON)</button>
-          <button className="btn-primary" onClick={() => handleExportBackup('csv')}>Export Backup (CSV/ZIP)</button>
-          <label className="btn-secondary cursor-pointer">
-            Import/Restore Backup
-            <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
-          </label>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          <Link href="/generate-receipt" className="card hover:shadow-lg transition cursor-pointer">
-            <div className="text-xl font-semibold mb-2">Generate Receipt</div>
-            <div className="text-gray-600">Create and print new receipts for your customers.</div>
+        {/* Main Action Buttons */}
+        <div className="flex flex-wrap gap-4 mb-8">
+          <Link href="/generate-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-600 text-white hover:bg-green-700 transition-colors text-lg flex-1 text-center">
+            Generate Receipt
           </Link>
-          <Link href="/view-receipt" className="card hover:shadow-lg transition cursor-pointer">
-            <div className="text-xl font-semibold mb-2">View Receipts</div>
-            <div className="text-gray-600">Browse, search, and manage all receipts.</div>
-          </Link>
-          <Link href="/dashboard/inventory-management" className="card hover:shadow-lg transition cursor-pointer">
-            <div className="text-xl font-semibold mb-2">Inventory Management</div>
-            <div className="text-gray-600">Manage your products, stock, and import/export inventory.</div>
-          </Link>
-          <Link href="/dashboard/customer-analytics" className="card hover:shadow-lg transition cursor-pointer">
-            <div className="text-xl font-semibold mb-2">Customer Analytics</div>
-            <div className="text-gray-600">Analyze customer data and view purchase history.</div>
-          </Link>
-          <Link href="/analytics" className="card hover:shadow-lg transition cursor-pointer">
-            <div className="text-xl font-semibold mb-2">Sales Analytics</div>
-            <div className="text-gray-600">Visualize sales trends and top products.</div>
-          </Link>
-          <Link href="/profile" className="card hover:shadow-lg transition cursor-pointer">
-            <div className="text-xl font-semibold mb-2">Business Profile</div>
-            <div className="text-gray-600">Edit your business info, logo, and preferences.</div>
+          <Link href="/view-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-600 text-white hover:bg-green-700 transition-colors text-lg flex-1 text-center">
+            View Receipts
           </Link>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-2">Quick Links</h2>
-          <ul className="list-disc ml-6 text-primary-700">
-            <li><Link href="/register">Register New Business</Link></li>
-            <li><Link href="/integrations">Integrations & Webhooks</Link></li>
-            <li><Link href="/login">Switch User / Login</Link></li>
-            <li><Link href="/help">Help & Onboarding Guide</Link></li>
-          </ul>
+        {/* Secondary Action Buttons */}
+        <div className="flex flex-wrap gap-4 mb-8">
+          <Link href="/dashboard/inventory-management" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-900 text-white hover:bg-green-800 transition-colors text-lg flex-1 text-center">
+            Inventory Management
+          </Link>
+          <Link href="/dashboard/customer-analytics" className="px-6 py-4 rounded-lg font-semibold shadow bg-green-900 text-white hover:bg-green-800 transition-colors text-lg flex-1 text-center">
+            Customer Analysis
+          </Link>
         </div>
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Advanced Receipt Search & Filter</h2>
           <div className="flex flex-wrap gap-2 mb-4">
             <input type="text" placeholder="Search by customer or receipt ID" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="input input-bordered" />
-            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input input-bordered" />
             <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input input-bordered" />
             <input type="number" placeholder="Min Amount" value={filterAmountMin} onChange={e => setFilterAmountMin(e.target.value)} className="input input-bordered w-32" />
             <input type="number" placeholder="Max Amount" value={filterAmountMax} onChange={e => setFilterAmountMax(e.target.value)} className="input input-bordered w-32" />
