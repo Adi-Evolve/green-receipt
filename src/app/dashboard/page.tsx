@@ -39,47 +39,41 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!hasMounted) return;
+    let parsed: any = null;
     if (typeof window !== 'undefined') {
-      // Always use businessInfo from localStorage for consistency
-      let parsed: any = null;
       try {
         const saved = localStorage.getItem('businessInfo');
         if (saved) parsed = JSON.parse(saved);
       } catch {}
-      setBusinessId(parsed?.businessId || '');
-      setUserCode(localStorage.getItem('user_code') || parsed?.businessId || '');
+      setBusinessId(parsed?.user_code || parsed?.businessId || parsed?.id || '');
+      setUserCode(parsed?.user_code || parsed?.businessId || parsed?.id || '');
     }
   }, [hasMounted]);
 
   useEffect(() => {
-    const businessId = localStorage.getItem('businessId');
-    if (!businessId) return;
+    if (!userCode) return;
     (async () => {
-      const { data, error } = await supabase
-        .from('receipts')
-        .select('*')
-        .eq('user_code', businessId)
-        .order('date', { ascending: false })
-        .limit(5);
-      if (data) {
-        setRecentReceipts((prev: any[]) => {
-          return [...prev].sort((a, b) => {
-            const getTime = (r: any) => {
-              if (r.receiptUniqueId) {
-                const parts = r.receiptUniqueId.split('_');
-                if (parts.length >= 2 && !isNaN(Number(parts[1]))) return Number(parts[1]);
-              }
-              if (r.date && !isNaN(Date.parse(r.date))) return new Date(r.date).getTime();
-              if (r.createdAt && !isNaN(Date.parse(r.createdAt))) return new Date(r.createdAt).getTime();
-              if (r.created_at && !isNaN(Date.parse(r.created_at))) return new Date(r.created_at).getTime();
-              return 0;
-            };
-            return getTime(b) - getTime(a); // Descending order (latest first)
-          });
-        });
+      // Try to fetch from Supabase
+      let receipts: any[] = [];
+      try {
+        const { data, error } = await supabase
+          .from('receipts')
+          .select('*')
+          .eq('user_code', userCode)
+          .order('date', { ascending: false })
+          .limit(5);
+        if (data) receipts = data;
+      } catch {}
+      // If none, try localStorage fallback
+      if (receipts.length === 0 && typeof window !== 'undefined') {
+        try {
+          const local = localStorage.getItem('receipts_' + userCode);
+          if (local) receipts = JSON.parse(local).slice(-5).reverse();
+        } catch {}
       }
+      setRecentReceipts(receipts);
     })();
-  }, [recentReceipts.length]);
+  }, [userCode]);
 
   useEffect(() => {
     if (!userCode) return;
@@ -101,7 +95,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchCustomers() {
-      const businessId = localStorage.getItem('businessId');
+      const businessId = localStorage.getItem('businessInfo') ? JSON.parse(localStorage.getItem('businessInfo') || '{}').user_code || JSON.parse(localStorage.getItem('businessInfo') || '{}').businessId || JSON.parse(localStorage.getItem('businessInfo') || '{}').id || '' : '';
       if (!businessId) return;
       let customersMap: Record<string, string> = {};
       let local = localStorage.getItem('customers_' + businessId);
