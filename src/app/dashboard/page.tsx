@@ -196,7 +196,7 @@ export default function DashboardPage() {
               <h2 className="text-xl font-semibold">Recent Receipts</h2>
               <button
                 className="btn-secondary"
-                onClick={() => setShowCustomerAnalytics(true)}
+                onClick={() => window.location.href = '/dashboard/customer-analytics'}
               >
                 Customer Analytics
               </button>
@@ -263,16 +263,6 @@ export default function DashboardPage() {
           <Footer />
         </div>
       </div>
-      {/* Customer Analytics Modal */}
-      {showCustomerAnalytics && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl w-full relative">
-            <button className="absolute top-2 right-2 text-gray-600" onClick={() => setShowCustomerAnalytics(false)}>&times;</button>
-            <h3 className="text-lg font-bold mb-2">Customer Analytics</h3>
-            <CustomerAnalytics receipts={recentReceipts} />
-          </div>
-        </div>
-      )}
     </main>
   );
 }
