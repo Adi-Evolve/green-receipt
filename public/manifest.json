@@ -1,11 +1,11 @@
 {
-  "name": "Green Receipt",
-  "short_name": "Receipt",
-  "start_url": ".",
+  "name": "Green Receipt Business Manager",
+  "short_name": "GreenReceipt",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#22c55e",
-  "description": "Modern receipt and bill generation app.",
+  "theme_color": "#017a5a",
+  "description": "A modern business management web app for receipts, inventory, analytics, and more.",
   "icons": [
     {
       "src": "/icon-192.png",

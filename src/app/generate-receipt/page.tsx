@@ -7,6 +7,7 @@ import QRCode from 'qrcode.react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { supabase } from '@/lib/supabaseClient';
+import SelectReceiptTemplate from '../components/SelectReceiptTemplate';
 
 interface Product {
   id: string;
@@ -122,6 +123,13 @@ export default function GenerateReceiptPage() {
   const [addingCustomer, setAddingCustomer] = useState(false);
   const [paidChecked, setPaidChecked] = useState(false);
   const [paidAmountInput, setPaidAmountInput] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('receiptTemplate') || 'classic';
+    }
+    return 'classic';
+  });
+  const [inventory, setInventory] = useState<any[]>([]);
 
   useEffect(() => {
     setHasMounted(true);
@@ -188,7 +196,27 @@ export default function GenerateReceiptPage() {
   }, [hasMounted]);
 
   useEffect(() => {
-    if (!hasMounted || !format || !businessInfo) return;
+    if (!hasMounted) return;
+    let bizId = '';
+    if (typeof window !== 'undefined') {
+      bizId = localStorage.getItem('businessId') || '';
+    }
+    async function fetchInventory() {
+      let localProducts: any[] = [];
+      if (bizId) {
+        try {
+          localProducts = JSON.parse(localStorage.getItem(`products_${bizId}`) || '[]');
+        } catch {}
+      }
+      let { data: supaProducts, error } = await supabase.from('products').select('*').eq('businessId', bizId);
+      if (error) supaProducts = [];
+      setInventory([...(localProducts || []), ...(supaProducts || [])]);
+    }
+    fetchInventory();
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
     // Update QR value whenever receipt changes
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format && format.columns && format.columns.gst ? (1 + p.gst/100) : 1), 0);
     setQrValue(JSON.stringify({
@@ -255,6 +283,12 @@ export default function GenerateReceiptPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && selectedTemplate) {
+      localStorage.setItem('receiptTemplate', selectedTemplate);
+    }
+  }, [selectedTemplate]);
 
   // --- Receipt Number Serial Logic ---
   function computeNextReceiptNumber(bizId: string): string {
@@ -352,11 +386,15 @@ export default function GenerateReceiptPage() {
     const updated = [...products];
     updated[idx].name = value;
     setProducts(updated);
-    // Show suggestions for product name
+    // Show suggestions for product name, dedupe by SKU or name
     if (value.length > 0) {
-      const suggestions = productsList.filter(
-        (prod: any) => (prod.productName || prod.name)?.toLowerCase().includes(value.toLowerCase())
-      );
+      const seen = new Set();
+      const suggestions = inventory.filter((prod: any) => {
+        const key = (prod.sku || prod.id || prod.name)?.toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return (prod.productName || prod.name)?.toLowerCase().includes(value.toLowerCase());
+      });
       setProductSuggestions(suggestions);
     } else {
       setProductSuggestions([]);
@@ -376,9 +414,11 @@ export default function GenerateReceiptPage() {
   function handleProductListChange(idx: number, field: keyof Product, value: string | number) {
     setProducts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
   }
+
   function addProduct() {
     setProducts(prev => [...prev, { id: '', name: '', price: 0, quantity: 1, gst: 0, amount: 0 }]);
   }
+
   function removeProduct(idx: number) {
     setProducts(prev => prev.filter((_, i) => i !== idx));
   }
@@ -453,11 +493,34 @@ export default function GenerateReceiptPage() {
         setQrValue(`${window.location.origin}/view-receipt/${receiptUniqueId}`);
         // --- Increment serial for next receipt ---
         setReceiptNumber(computeNextReceiptNumber(bizId));
+        await updateInventoryAfterSale(products);
       }
     } catch (err: unknown) {
       setSaving(false);
       if (err instanceof Error) setSaveError('Error saving receipt to Supabase: ' + err.message);
       else setSaveError('Unknown error saving receipt to Supabase.');
+    }
+  }
+
+  async function updateInventoryAfterSale(products: Product[]) {
+    const bizId = businessInfo.businessId || (businessInfo as any).user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
+    if (!bizId) return;
+    const updates: any[] = [];
+    products.forEach((p: Product) => {
+      const invProd = inventory.find((prod: any) => prod.sku === p.id);
+      if (invProd) {
+        updates.push({
+          id: invProd.id,
+          stock: invProd.stock - p.quantity,
+        });
+      }
+    });
+    if (updates.length > 0) {
+      try {
+        await supabase.from('products').upsert(updates);
+      } catch (error) {
+        console.error('Error updating inventory:', error);
+      }
     }
   }
 
@@ -554,6 +617,10 @@ export default function GenerateReceiptPage() {
                   <option key={f.name} value={f.name}>{f.name}</option>
                 ))}
               </select>
+            </div>
+            {/* Receipt Template Selection */}
+            <div className="mb-6">
+              <SelectReceiptTemplate selected={selectedTemplate} setSelected={setSelectedTemplate} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

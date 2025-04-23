@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from '@/lib/supabaseClient';
+import { RECEIPT_TEMPLATES } from '../../components/ReceiptTemplates';
 
 export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?: any, id?: string }) {
   const [receipt, setReceipt] = useState<any>(initialReceipt || null);
@@ -21,6 +22,27 @@ export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?:
   if (loading) return <div className="text-center p-8">Loading receipt...</div>;
   if (error) return <div className="text-center text-red-600 p-8">{error}</div>;
   if (!receipt) return <div className="text-center text-gray-500 p-8">Receipt not found.</div>;
+
+  // Determine template
+  const templateId = (typeof window !== 'undefined' && localStorage.getItem('receiptTemplate')) || 'classic';
+  const template = RECEIPT_TEMPLATES.find(t => t.id === templateId) || RECEIPT_TEMPLATES[0];
+
+  // Template-based classes for sections
+  const headerClass = template.id === 'colorful'
+    ? 'bg-gradient-to-r from-green-400 to-blue-500 text-white rounded-t-xl'
+    : template.id === 'modern'
+      ? 'bg-gray-50 border-l-8 border-primary-600'
+      : 'bg-white border-b border-gray-400';
+  const tableClass = template.id === 'colorful'
+    ? 'bg-white rounded-b-xl shadow-lg'
+    : template.id === 'modern'
+      ? 'bg-white border border-primary-100'
+      : 'bg-white border border-gray-300';
+  const totalsClass = template.id === 'colorful'
+    ? 'bg-gradient-to-r from-green-100 to-blue-100 text-primary-800'
+    : template.id === 'modern'
+      ? 'bg-primary-50 text-primary-900'
+      : 'bg-gray-100';
 
   // Always use business info from localStorage if available
   let businessProfile: any = {};
@@ -65,34 +87,23 @@ export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?:
       className="max-w-2xl mx-auto bg-white shadow-xl rounded-lg border border-gray-300 p-0 relative overflow-hidden print:max-w-full print:shadow-none print:border-0"
       style={{ fontFamily: format.font || 'Segoe UI, Arial, sans-serif', color: format.color || '#222', minWidth: 400 }}
     >
-      <div className="flex justify-between items-start px-8 pt-8 pb-2">
-        {/* Left: Logo + Business Info */}
-        <div className="flex flex-col items-start w-1/2">
-          {logoUrl && (
-            <img src={logoUrl} alt="Business Logo" className="h-16 mb-2 object-contain" style={{ maxWidth: 120 }} />
-          )}
-          <div className="text-2xl font-bold tracking-wide mb-1">{businessName}</div>
-          <div className="text-sm text-gray-700 mb-1">{address}</div>
-          <div className="text-sm text-gray-700">{phone}</div>
-          <div className="text-sm text-gray-700">{email}</div>
-        </div>
-        {/* Right: Customer Info */}
-        <div className="flex flex-col items-end w-1/2">
-          <div className="text-sm text-gray-700 font-semibold">Customer Details</div>
-          <div className="text-base font-bold">{receipt.customer?.name || receipt.customerName || '-'}</div>
-          <div className="text-xs">Customer ID: <span className="font-mono">{receipt.customer?.id || receipt.customerId || receipt.customer_id || '-'}</span></div>
-          {receipt.customer?.phone && <div className="text-xs">Phone: {receipt.customer.phone}</div>}
-          {receipt.customer?.email && <div className="text-xs">Email: {receipt.customer.email}</div>}
-        </div>
+      {/* Receipt Header */}
+      <div className={`flex flex-col items-center py-6 px-8 ${headerClass}`}>
+        <div className="text-2xl font-bold mb-1">{businessName}</div>
+        {logoUrl && (
+          <img src={logoUrl} alt="Logo" className="h-12 mb-2" />
+        )}
+        <div className="text-sm opacity-80">{address}</div>
+        <div className="text-sm opacity-80">{phone}</div>
+        <div className="text-sm opacity-80">{email}</div>
       </div>
       {/* Receipt Info Row */}
-      <div className="flex justify-between items-center px-8 py-2 bg-gray-50 border-b">
+      <div className={`flex justify-between items-center px-8 py-2 border-b ${template.previewClass}`}>
         <div className="text-sm font-semibold">Receipt No: <span className="font-mono">{receipt.receiptNumber || receipt.receipt_number || receipt.id}</span></div>
         <div className="text-sm">Date: <span className="font-mono">{receipt.date}</span></div>
       </div>
       {/* Products Table */}
-      <div className="px-8 py-4">
-        {/* Debug: Show products array */}
+      <div className={`px-8 py-4 ${tableClass}`}>
         {(!receipt.products || receipt.products.length === 0) && (
           <div className="mb-2 text-red-600 text-xs">No products found for this receipt.</div>
         )}
@@ -125,7 +136,7 @@ export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?:
           </tbody>
         </table>
         {/* Totals */}
-        <div className="flex flex-col items-end mt-4">
+        <div className={`flex flex-col items-end mt-4 ${totalsClass}`}>
           <div className="text-base font-bold">Total: ₹{(() => {
             if (receipt.products && receipt.products.length > 0) {
               return receipt.products.reduce((sum: number, p: any) => sum + (p.price * p.quantity * (format.columns?.gst ? (1 + (p.gst || 0)/100) : 1)), 0).toFixed(2);

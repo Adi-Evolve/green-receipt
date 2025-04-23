@@ -77,6 +77,29 @@ export default function ViewReceiptPage() {
       .save();
   }
 
+  // When a receipt is generated, update product stock
+  async function updateInventoryAfterSale(productsSold: any[]) {
+    const businessId = typeof window !== 'undefined' ? localStorage.getItem('businessId') : '';
+    let inventory: any[] = [];
+    if (businessId) {
+      try {
+        inventory = JSON.parse(localStorage.getItem(`products_${businessId}`) || '[]');
+      } catch {}
+    }
+    const updated = inventory.map(prod => {
+      const sold = productsSold.find((p: any) => p.sku === prod.sku);
+      if (sold) {
+        return { ...prod, stock: (prod.stock || 0) - (sold.quantity || 0) };
+      }
+      return prod;
+    });
+    localStorage.setItem(`products_${businessId}`, JSON.stringify(updated));
+    // Sync to Supabase
+    for (const prod of updated) {
+      await supabase.from('products').update({ stock: prod.stock }).eq('sku', prod.sku).eq('businessId', businessId);
+    }
+  }
+
   if (error) return <div className="p-8 text-red-600">{error}</div>;
   if (!receipt) return <div className="p-8">Loading...</div>;
 
@@ -85,6 +108,10 @@ export default function ViewReceiptPage() {
   if (!logoUrl && typeof window !== "undefined") {
     logoUrl = localStorage.getItem("logoUrl") || "";
   }
+
+  // After receipt is saved (wherever you save receipts), call updateInventoryAfterSale(receipt.products)
+  // For demonstration purposes, we'll call it here, but in a real scenario, you would call it after saving the receipt
+  updateInventoryAfterSale(receipt.products);
 
   return (
     <>

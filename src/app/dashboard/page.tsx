@@ -11,6 +11,10 @@ import NotificationBell from '../components/NotificationBell';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import CustomerAnalytics from './components/CustomerAnalytics'; // Import the CustomerAnalytics component
+import Papa from 'papaparse';
+import JSZip from 'jszip';
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
 
 export default function DashboardPage() {
   // All hooks must be at the top, before any return
@@ -22,6 +26,13 @@ export default function DashboardPage() {
   const [userCode, setUserCode] = useState('');
   const [customers, setCustomers] = useState<Record<string, string>>({});
   const [showCustomerAnalytics, setShowCustomerAnalytics] = useState(false); // Add a state to show/hide the customer analytics modal
+  const [alert, setAlert] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterAmountMin, setFilterAmountMin] = useState('');
+  const [filterAmountMax, setFilterAmountMax] = useState('');
+  const [salesChartData, setSalesChartData] = useState<any>(null);
 
   useEffect(() => { setHasMounted(true); }, []);
 
@@ -119,6 +130,105 @@ export default function DashboardPage() {
     fetchCustomers();
   }, [recentReceipts]);
 
+  useEffect(() => {
+    // Aggregate sales by month
+    const monthly: Record<string, number> = {};
+    recentReceipts.forEach(r => {
+      const month = r.date?.slice(0, 7) || 'Unknown';
+      monthly[month] = (monthly[month] || 0) + (r.total || 0);
+    });
+    setSalesChartData({
+      labels: Object.keys(monthly),
+      datasets: [{ label: 'Sales', data: Object.values(monthly), backgroundColor: '#22c55e' }]
+    });
+  }, [recentReceipts]);
+
+  // Backup: Export all business data (customers, products, receipts) as JSON or CSV
+  async function handleExportBackup(format: 'json' | 'csv') {
+    const businessId = typeof window !== 'undefined' ? localStorage.getItem('businessId') : '';
+    // Fetch from localStorage
+    const localCustomers = JSON.parse(localStorage.getItem(`customers_${businessId}`) || '[]');
+    const localProducts = JSON.parse(localStorage.getItem(`products_${businessId}`) || '[]');
+    const localReceipts = JSON.parse(localStorage.getItem(`receipts_${businessId}`) || '[]');
+    // Fetch from Supabase
+    const { data: dbCustomers } = await supabase.from('customers').select('*').eq('businessId', businessId);
+    const { data: dbProducts } = await supabase.from('products').select('*').eq('businessId', businessId);
+    const { data: dbReceipts } = await supabase.from('receipts').select('*').eq('businessId', businessId);
+    // Merge and dedupe by id/email/sku
+    const customers = [...localCustomers, ...(dbCustomers || [])].filter((c, i, arr) => arr.findIndex(x => x.email && c.email && x.email === c.email) === i);
+    const products = [...localProducts, ...(dbProducts || [])].filter((p, i, arr) => arr.findIndex(x => (x.sku || x.id) && (p.sku || p.id) && (x.sku || p.id) === (p.sku || p.id)) === i);
+    const receipts = [...localReceipts, ...(dbReceipts || [])].filter((r, i, arr) => arr.findIndex(x => x.id && r.id && x.id === r.id) === i);
+    const backup = { customers, products, receipts };
+    if (format === 'json') {
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'business-backup.json';
+      a.click();
+    } else {
+      // CSV: create 3 CSVs and zip if needed
+      const customersCSV = Papa.unparse(customers);
+      const productsCSV = Papa.unparse(products);
+      const receiptsCSV = Papa.unparse(receipts);
+      const zip = new JSZip();
+      zip.file('customers.csv', customersCSV);
+      zip.file('products.csv', productsCSV);
+      zip.file('receipts.csv', receiptsCSV);
+      zip.generateAsync({ type: 'blob' }).then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'business-backup.zip';
+        a.click();
+      });
+    }
+  }
+
+  // Restore: Import backup JSON
+  async function handleImportBackup(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const backup = JSON.parse(event.target?.result as string);
+        // Restore to localStorage and Supabase
+        const businessId = typeof window !== 'undefined' ? localStorage.getItem('businessId') : '';
+        if (backup.customers) {
+          localStorage.setItem(`customers_${businessId}`, JSON.stringify(backup.customers));
+          for (const c of backup.customers) {
+            await supabase.from('customers').upsert({ ...c, businessId });
+          }
+        }
+        if (backup.products) {
+          localStorage.setItem(`products_${businessId}`, JSON.stringify(backup.products));
+          for (const p of backup.products) {
+            await supabase.from('products').upsert({ ...p, businessId });
+          }
+        }
+        if (backup.receipts) {
+          localStorage.setItem(`receipts_${businessId}`, JSON.stringify(backup.receipts));
+          for (const r of backup.receipts) {
+            await supabase.from('receipts').upsert({ ...r, businessId });
+          }
+        }
+        setAlert('Backup restored successfully!');
+      } catch (err) {
+        setAlert('Failed to restore backup: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // Advanced Search & Filtering (example for receipts)
+  const filteredReceipts = recentReceipts.filter(receipt => {
+    const matchesQuery = searchQuery === '' || (receipt.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || receipt.id?.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesDate = (!filterDateFrom || new Date(receipt.date) >= new Date(filterDateFrom)) && (!filterDateTo || new Date(receipt.date) <= new Date(filterDateTo));
+    const matchesAmount = (!filterAmountMin || (receipt.total || 0) >= Number(filterAmountMin)) && (!filterAmountMax || (receipt.total || 0) <= Number(filterAmountMax));
+    return matchesQuery && matchesDate && matchesAmount;
+  });
+
   if (!hasMounted || typeof window === 'undefined') return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div>
@@ -127,142 +237,124 @@ export default function DashboardPage() {
   );
 
   return (
-    <main className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       <ServerNavbar isLoggedIn={true} businessName={businessName} />
-      
-      <div className="flex-grow bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="flex items-center justify-between mb-8">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-              <p className="mt-2 text-sm text-gray-600">
-                Welcome back to your Green Receipt business portal. Your Business ID: <span className="font-medium">{businessId || 'N/A'}</span>
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-4 mb-4">
-              {/* Notification Bell - pass userId from auth/session */}
-              <NotificationBell userId={businessId} />
-            </div>
+      <div className="max-w-5xl mx-auto py-8 px-4">
+        {alert && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded shadow flex items-center">
+            <span className="material-icons mr-2">error_outline</span>
+            {alert}
           </div>
-          
-          {/* Quick Action Buttons - Centered, grouped */}
-          <div className="flex flex-wrap gap-4 mb-8 justify-center">
-            {/* Group 1: Main Actions */}
-            <div className="flex gap-2">
-              <Link href="/generate-receipt" 
-                className="btn-primary flex items-center text-base px-5 py-2 rounded-l-lg border-r-0">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                Generate Receipt
-              </Link>
-              <Link href="/recent-receipts" className="btn-primary flex items-center text-base px-5 py-2 rounded-r-lg border-l-0">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                Recent Receipts
-              </Link>
-            </div>
-            {/* Group 2: Add Actions */}
-            <div className="flex gap-2">
-              <Link href="/add-product" className="bg-white border border-primary-300 text-primary-700 flex items-center text-base px-5 py-2 rounded-l-lg hover:bg-primary-50 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                Add Product
-              </Link>
-              <Link href="/add-customer" className="bg-white border border-primary-300 text-primary-700 flex items-center text-base px-5 py-2 rounded-r-lg hover:bg-primary-50 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v4m0 0a4 4 0 110 8 4 4 0 010-8zm0 0v4m0 4v4" /></svg>
-                Add Customer
-              </Link>
-            </div>
+        )}
+        <h1 className="text-3xl font-bold mb-8 text-primary-700">Business Management Dashboard</h1>
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button className="btn-primary" onClick={() => handleExportBackup('json')}>Export Backup (JSON)</button>
+          <button className="btn-primary" onClick={() => handleExportBackup('csv')}>Export Backup (CSV/ZIP)</button>
+          <label className="btn-secondary cursor-pointer">
+            Import/Restore Backup
+            <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
+          </label>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          <Link href="/generate-receipt" className="card hover:shadow-lg transition cursor-pointer">
+            <div className="text-xl font-semibold mb-2">Generate Receipt</div>
+            <div className="text-gray-600">Create and print new receipts for your customers.</div>
+          </Link>
+          <Link href="/view-receipt" className="card hover:shadow-lg transition cursor-pointer">
+            <div className="text-xl font-semibold mb-2">View Receipts</div>
+            <div className="text-gray-600">Browse, search, and manage all receipts.</div>
+          </Link>
+          <Link href="/dashboard/inventory-management" className="card hover:shadow-lg transition cursor-pointer">
+            <div className="text-xl font-semibold mb-2">Inventory Management</div>
+            <div className="text-gray-600">Manage your products, stock, and import/export inventory.</div>
+          </Link>
+          <Link href="/dashboard/customer-analytics" className="card hover:shadow-lg transition cursor-pointer">
+            <div className="text-xl font-semibold mb-2">Customer Analytics</div>
+            <div className="text-gray-600">Analyze customer data and view purchase history.</div>
+          </Link>
+          <Link href="/analytics" className="card hover:shadow-lg transition cursor-pointer">
+            <div className="text-xl font-semibold mb-2">Sales Analytics</div>
+            <div className="text-gray-600">Visualize sales trends and top products.</div>
+          </Link>
+          <Link href="/profile" className="card hover:shadow-lg transition cursor-pointer">
+            <div className="text-xl font-semibold mb-2">Business Profile</div>
+            <div className="text-gray-600">Edit your business info, logo, and preferences.</div>
+          </Link>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-2">Quick Links</h2>
+          <ul className="list-disc ml-6 text-primary-700">
+            <li><Link href="/register">Register New Business</Link></li>
+            <li><Link href="/integrations">Integrations & Webhooks</Link></li>
+            <li><Link href="/login">Switch User / Login</Link></li>
+            <li><Link href="/help">Help & Onboarding Guide</Link></li>
+          </ul>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Advanced Receipt Search & Filter</h2>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <input type="text" placeholder="Search by customer or receipt ID" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="input input-bordered" />
+            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input input-bordered" />
+            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input input-bordered" />
+            <input type="number" placeholder="Min Amount" value={filterAmountMin} onChange={e => setFilterAmountMin(e.target.value)} className="input input-bordered w-32" />
+            <input type="number" placeholder="Max Amount" value={filterAmountMax} onChange={e => setFilterAmountMax(e.target.value)} className="input input-bordered w-32" />
           </div>
-
-          {/* Sales, Offers, Drafts Buttons - with icons, reduced size */}
-          <div className="flex flex-wrap gap-4 mb-8 justify-center">
-            <Link href="/sales" className="btn-secondary flex flex-col items-center justify-center text-base px-4 py-3 w-28 h-20">
-              <FcSalesPerformance className="text-3xl mb-1" />
-              Sales
-            </Link>
-            <Link href="/offers" className="btn-secondary flex flex-col items-center justify-center text-base px-4 py-3 w-28 h-20">
-              <MdLocalOffer className="text-3xl mb-1 text-yellow-600" />
-              Offers
-            </Link>
-            <Link href="/drafts" className="btn-secondary flex flex-col items-center justify-center text-base px-4 py-3 w-28 h-20">
-              <FaRegFileAlt className="text-3xl mb-1 text-blue-600" />
-              Drafts
-            </Link>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt #</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReceipts.map((receipt: any) => (
+                  <tr key={receipt.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{receipt.receiptNumber || receipt.id}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.customerName || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{receipt.total || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {/* Recent Receipts Section */}
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Recent Receipts</h2>
-              <button
-                className="btn-secondary"
-                onClick={() => window.location.href = '/dashboard/customer-analytics'}
-              >
-                Customer Analytics
-              </button>
-            </div>
-            {recentReceipts.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead>
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt #</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentReceipts.map((receipt: any, index: number) => (
-                      <tr key={receipt.id || index}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {(() => {
-                            const businessId = receipt.businessId || receipt.business_id || localStorage.getItem('businessId') || 'BIZ';
-                            const billNo = receipt.receiptNumber || receipt.receipt_number || receipt.id;
-                            let serial = '';
-                            if (typeof billNo === 'number') {
-                              serial = billNo.toString().padStart(2, '0');
-                            } else if (typeof billNo === 'string') {
-                              const match = billNo.match(/(\d+)$/);
-                              serial = match ? match[1].padStart(2, '0') : '01';
-                            } else {
-                              serial = '01';
-                            }
-                            return `GR-${businessId}-${serial}`;
-                          })()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{customers[receipt.customer_id || receipt.customerId || ''] || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {receipt.date}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          ₹{receipt.total || receipt.totalAmount || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-3">
-                            <Link href={`/view-receipt/${receipt.id || receipt.receipt_id}`} className="text-primary-600 hover:text-primary-900">
-                              View
-                            </Link>
-                            <Link href={`/view-receipt/${receipt.id || receipt.receipt_id}/print`} className="text-gray-600 hover:text-gray-900">
-                              Print
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                <p className="text-lg">No receipts yet. Create your first receipt!</p>
-              </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Sales Analytics (Monthly)</h2>
+          <div className="w-full h-64">
+            {salesChartData && (
+              <canvas id="salesChart"></canvas>
             )}
           </div>
-          <Footer />
         </div>
+        {salesChartData && (
+          <script>
+            {`
+              const ctx = document.getElementById('salesChart').getContext('2d');
+              const chart = new Chart(ctx, {
+                type: 'bar',
+                data: ${JSON.stringify(salesChartData)},
+                options: {
+                  responsive: true,
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                    },
+                    title: {
+                      display: true,
+                      text: 'Monthly Sales'
+                    }
+                  }
+                }
+              });
+            `}
+          </script>
+        )}
       </div>
-    </main>
+      <Footer />
+    </div>
   );
 }
