@@ -142,6 +142,34 @@ export default function DashboardPage() {
     });
   }, [recentReceipts]);
 
+  useEffect(() => {
+    if (salesChartData) {
+      const canvas = document.getElementById('salesChart') as HTMLCanvasElement | null;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const chart = new Chart(ctx, {
+        type: 'bar',
+        data: salesChartData,
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            title: {
+              display: true,
+              text: 'Monthly Sales'
+            }
+          }
+        }
+      });
+      return () => {
+        chart.destroy();
+      };
+    }
+  }, [salesChartData]);
+
   // Advanced Search & Filtering (example for receipts)
   const filteredReceipts = recentReceipts.filter(receipt => {
     const matchesQuery = searchQuery === '' || (receipt.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || receipt.id?.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -177,6 +205,12 @@ export default function DashboardPage() {
           <Link href="/generate-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#017a5a] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Generate Receipt
           </Link>
+          <Link href="/dashboard/add-product" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#008c7e] text-white hover:bg-[#017a5a] transition-colors text-lg flex-1 text-center">
+            Add Product
+          </Link>
+          <Link href="/dashboard/add-customer" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#008c7e] text-white hover:bg-[#017a5a] transition-colors text-lg flex-1 text-center">
+            Add Customer
+          </Link>
         </div>
         {/* Secondary Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-8">
@@ -203,19 +237,27 @@ export default function DashboardPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">View</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredReceipts.map((receipt: any, idx: number) => (
-                  <tr key={receipt.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {`gr-${businessId}-${idx+1}`}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.customerName || receipt.customer_name || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{receipt.total || '-'}</td>
-                  </tr>
-                ))}
+                {filteredReceipts.map((receipt: any, idx: number) => {
+                  // Try to get customer name from customers map if not present in receipt
+                  const customerName = receipt.customerName || receipt.customer_name || customers[receipt.customerId || receipt.customer_id] || '-';
+                  return (
+                    <tr key={receipt.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {`GR-${businessId}-${idx+1}`}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{customerName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{receipt.total || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                        <Link href={`/recent-receipts/${receipt.id}`} className="underline hover:text-blue-800">View</Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -228,29 +270,6 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-        {salesChartData && (
-          <script>
-            {`
-              const ctx = document.getElementById('salesChart').getContext('2d');
-              const chart = new Chart(ctx, {
-                type: 'bar',
-                data: ${JSON.stringify(salesChartData)},
-                options: {
-                  responsive: true,
-                  plugins: {
-                    legend: {
-                      position: 'top',
-                    },
-                    title: {
-                      display: true,
-                      text: 'Monthly Sales'
-                    }
-                  }
-                }
-              });
-            `}
-          </script>
-        )}
       </div>
       <Footer />
     </div>
