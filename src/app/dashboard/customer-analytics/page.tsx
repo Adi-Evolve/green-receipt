@@ -30,19 +30,22 @@ export default function CustomerAnalyticsPage() {
     setLoading(true);
     (async () => {
       let data: any[] = [];
-      try {
-        const res = await supabase
-          .from('receipts')
-          .select('*')
-          .eq('user_code', userCode)
-          .order('date', { ascending: false });
-        if (res.data) data = res.data;
-      } catch {}
-      // Fallback to localStorage
-      if (data.length === 0 && typeof window !== 'undefined') {
+      // Try localStorage first
+      if (typeof window !== 'undefined') {
         try {
           const local = localStorage.getItem('receipts_' + userCode);
           if (local) data = JSON.parse(local);
+        } catch {}
+      }
+      // If not found in localStorage, try Supabase
+      if ((!data || data.length === 0)) {
+        try {
+          const res = await supabase
+            .from('receipts')
+            .select('*')
+            .eq('user_code', userCode)
+            .order('date', { ascending: false });
+          if (res.data) data = res.data;
         } catch {}
       }
       setReceipts(data);

@@ -157,20 +157,26 @@ export default function GenerateReceiptPage() {
       }
       setProducts([{ id: '1', name: '', price: 0, quantity: 1, gst: 0, amount: 0 }]);
       setReceiptNumber(computeNextReceiptNumber(bizId));
-      let loaded = false;
+      // --- Product List Deduplication Logic ---
+      let localProducts: any[] = [];
       try {
         const local = localStorage.getItem(`products_${bizId}`);
         if (local) {
-          setProductsList(JSON.parse(local));
-          loaded = true;
+          localProducts = JSON.parse(local);
         }
       } catch {}
-      if (!loaded) {
-        (async () => {
+      // Now fetch Supabase products and append only unique ones
+      (async () => {
+        let supaProducts: any[] = [];
+        try {
           const { data } = await supabase.from('products').select('*').eq('user_code', bizId);
-          if (data) setProductsList(data);
-        })();
-      }
+          if (data) supaProducts = data;
+        } catch {}
+        // Deduplicate by product name (case-insensitive)
+        const localNames = new Set(localProducts.map((p: any) => (p.productName || p.name || '').toLowerCase()));
+        const uniqueSupa = supaProducts.filter((p: any) => !localNames.has((p.productName || p.name || '').toLowerCase()));
+        setProductsList([...localProducts, ...uniqueSupa]);
+      })();
       (async () => {
         const { data, error } = await supabase.from('customers').select('*').eq('user_code', bizId);
         if (data) setCustomers(data);
