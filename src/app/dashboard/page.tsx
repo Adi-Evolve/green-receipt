@@ -205,16 +205,16 @@ export default function DashboardPage() {
           <Link href="/generate-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#017a5a] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Generate Receipt
           </Link>
-          <Link href="/dashboard/add-product" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#008c7e] text-white hover:bg-[#017a5a] transition-colors text-lg flex-1 text-center">
+          <Link href="/add-product" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#008c7e] text-white hover:bg-[#017a5a] transition-colors text-lg flex-1 text-center">
             Add Product
           </Link>
-          <Link href="/dashboard/add-customer" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#008c7e] text-white hover:bg-[#017a5a] transition-colors text-lg flex-1 text-center">
+          <Link href="/add-customer" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#008c7e] text-white hover:bg-[#017a5a] transition-colors text-lg flex-1 text-center">
             Add Customer
           </Link>
         </div>
         {/* Secondary Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-8">
-          <Link href="/dashboard/inventory-management" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
+          <Link href="/inventory-management" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Inventory Management
           </Link>
           <Link href="/dashboard/customer-analytics" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
