@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import ServerNavbar from '@/components/ServerNavbar';
 import Footer from '@/components/Footer';
 import { useRouter } from 'next/navigation';
-import SelectReceiptTemplate from '@/components/SelectReceiptTemplate'; // Import the SelectReceiptTemplate component
+import SelectReceiptTemplate from '../components/SelectReceiptTemplate'; // Import the SelectReceiptTemplate component
 
 // --- Type Definitions for Bill Formats ---
 interface BillDesign {
