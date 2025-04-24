@@ -171,11 +171,16 @@ export default function DashboardPage() {
   }, [salesChartData]);
 
   // Advanced Search & Filtering (example for receipts)
-  const filteredReceipts = recentReceipts.filter(receipt => {
-    const matchesQuery = searchQuery === '' || (receipt.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || receipt.id?.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesDate = (!filterDateTo || new Date(receipt.date) <= new Date(filterDateTo));
-    const matchesAmount = (!filterAmountMin || (receipt.total || 0) >= Number(filterAmountMin)) && (!filterAmountMax || (receipt.total || 0) <= Number(filterAmountMax));
-    return matchesQuery && matchesDate && matchesAmount;
+  const filteredReceipts = recentReceipts.filter((receipt: any) => {
+    const q = searchQuery.toLowerCase();
+    const customerName = receipt.customerName || receipt.customer_name || customers[receipt.customerId || receipt.customer_id] || '';
+    const receiptNum = receipt.receiptNumber || receipt.receipt_number || '';
+    return (
+      (!q || customerName.toLowerCase().includes(q) || receiptNum.toLowerCase().includes(q) || (receipt.id && receipt.id.toLowerCase().includes(q))) &&
+      (!filterDateTo || new Date(receipt.date) <= new Date(filterDateTo)) &&
+      (!filterAmountMin || (receipt.total || 0) >= Number(filterAmountMin)) &&
+      (!filterAmountMax || (receipt.total || 0) <= Number(filterAmountMax))
+    );
   });
 
   if (!hasMounted || typeof window === 'undefined') return (
@@ -199,11 +204,11 @@ export default function DashboardPage() {
         <div className="text-sm text-gray-600 mb-8">Welcome to Green Receipt business portal, your business ID is: <span className="font-mono text-[#008c7e]">{businessId}</span></div>
         {/* Main Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-8">
-          <Link href="/recent-receipts" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#017a5a] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
-            Recent Receipts
-          </Link>
           <Link href="/generate-receipt" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#017a5a] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Generate Receipt
+          </Link>
+          <Link href="/recent-receipts" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#017a5a] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
+            Recent Receipts
           </Link>
           <Link href="/add-product" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#008c7e] text-white hover:bg-[#017a5a] transition-colors text-lg flex-1 text-center">
             Add Product
@@ -212,19 +217,20 @@ export default function DashboardPage() {
             Add Customer
           </Link>
         </div>
+        <div className="mb-10"></div>
         {/* Secondary Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-8">
-          <Link href="/inventory-management" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
+          <Link href="/dashboard/inventory-management" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Inventory Management
           </Link>
           <Link href="/dashboard/customer-analytics" className="px-6 py-4 rounded-lg font-semibold shadow bg-[#00524c] text-white hover:bg-[#008c7e] transition-colors text-lg flex-1 text-center">
             Customer Analysis
           </Link>
         </div>
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-white rounded-lg shadow p-6 mb-6 mt-12">
           <h2 className="text-lg font-semibold mb-4">Advanced Receipt Search & Filter</h2>
           <div className="flex flex-wrap gap-2 mb-4">
-            <input type="text" placeholder="Search by customer or receipt ID" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="input input-bordered" />
+            <input type="text" placeholder="Search by customer, receipt number, or ID" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="input input-bordered" />
             <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input input-bordered" />
             <input type="number" placeholder="Min Amount" value={filterAmountMin} onChange={e => setFilterAmountMin(e.target.value)} className="input input-bordered w-32" />
             <input type="number" placeholder="Max Amount" value={filterAmountMax} onChange={e => setFilterAmountMax(e.target.value)} className="input input-bordered w-32" />
@@ -253,7 +259,7 @@ export default function DashboardPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{receipt.date}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹{receipt.total || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                        <Link href={`/recent-receipts/${receipt.id}`} className="underline hover:text-blue-800">View</Link>
+                        <Link href={`/view-receipt/${receipt.id}`} className="underline hover:text-blue-800">View</Link>
                       </td>
                     </tr>
                   );

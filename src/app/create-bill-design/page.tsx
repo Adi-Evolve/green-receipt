@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import ServerNavbar from '@/components/ServerNavbar';
 import Footer from '@/components/Footer';
 import { useRouter } from 'next/navigation';
+import SelectReceiptTemplate from '@/components/SelectReceiptTemplate'; // Import the SelectReceiptTemplate component
 
 // --- Type Definitions for Bill Formats ---
 interface BillDesign {
@@ -40,7 +41,8 @@ const DEFAULT_FORMAT: BillDesign = {
     layout: 'default',
     showBorder: true,
     showGrid: false,
-    preview: false
+    preview: false,
+    receiptTemplate: '' // Add receiptTemplate to the default format
   }
 };
 
@@ -60,6 +62,7 @@ export default function CreateBillDesignPage() {
   const [businessId, setBusinessId] = useState('');
   const [renamingIdx, setRenamingIdx] = useState<number|null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState(''); // Add state for selected template
 
   useEffect(() => {
     let biz = localStorage.getItem('businessInfo');
@@ -125,6 +128,8 @@ export default function CreateBillDesignPage() {
         toSave = [{ ...DEFAULT_FORMAT }];
         setFormats(toSave);
       }
+      // Update the receipt template in the format design
+      toSave[selectedIdx].designData.receiptTemplate = selectedTemplate;
       localStorage.setItem(`billDesigns_${id}`, JSON.stringify(toSave));
       setSaveError('Saved locally!');
     } catch (err: any) {
@@ -247,6 +252,10 @@ export default function CreateBillDesignPage() {
                   <option value="compact">Compact</option>
                   <option value="modern">Modern</option>
                 </select>
+              </div>
+              <div className="mb-6">
+                <label className="block font-medium mb-1">Choose a Receipt Template</label>
+                <SelectReceiptTemplate selected={selectedTemplate} setSelected={setSelectedTemplate} />
               </div>
               <div className="mb-4 flex gap-6 items-center">
                 <label className="flex items-center gap-2">

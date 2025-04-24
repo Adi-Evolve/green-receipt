@@ -7,7 +7,6 @@ import QRCode from 'qrcode.react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { supabase } from '@/lib/supabaseClient';
-import SelectReceiptTemplate from '../components/SelectReceiptTemplate';
 
 interface Product {
   id: string;
@@ -123,12 +122,6 @@ export default function GenerateReceiptPage() {
   const [addingCustomer, setAddingCustomer] = useState(false);
   const [paidChecked, setPaidChecked] = useState(false);
   const [paidAmountInput, setPaidAmountInput] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('receiptTemplate') || 'classic';
-    }
-    return 'classic';
-  });
   const [inventory, setInventory] = useState<any[]>([]);
 
   useEffect(() => {
@@ -221,7 +214,7 @@ export default function GenerateReceiptPage() {
     const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format && format.columns && format.columns.gst ? (1 + p.gst/100) : 1), 0);
     setQrValue(JSON.stringify({
       receiptNumber,
-      businessId: businessInfo?.businessId || (businessInfo as any)?.user_code,
+      businessId: businessInfo?.businessId || (businessInfo as any).user_code,
       businessName: businessInfo?.name,
       customerId,
       products,
@@ -284,27 +277,32 @@ export default function GenerateReceiptPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && selectedTemplate) {
-      localStorage.setItem('receiptTemplate', selectedTemplate);
-    }
-  }, [selectedTemplate]);
-
   // --- Receipt Number Serial Logic ---
   function computeNextReceiptNumber(bizId: string): string {
-    // Get all receipts and drafts for this business from localStorage
+    // Get all receipts and drafts for this business from localStorage and Supabase
     let serial = 1;
+    let allSerials: number[] = [];
     try {
+      // Local receipts
       const receiptsArr = JSON.parse(localStorage.getItem(`receipts_${bizId}`) || '[]');
       const draftsArr = JSON.parse(localStorage.getItem(`drafts_${bizId}`) || '[]');
-      const all = [...receiptsArr, ...draftsArr];
-      const serials = all.map((r: any) => {
+      const allLocal = [...receiptsArr, ...draftsArr];
+      allLocal.forEach((r: any) => {
         const num = (r.receiptNumber || r.receipt_number || '').toString().match(/GR-[^-]+-(\d+)/);
-        return num ? parseInt(num[1], 10) : 0;
+        if (num) allSerials.push(parseInt(num[1], 10));
       });
-      serial = Math.max(...serials, 0) + 1;
     } catch {}
-    return `GR-${bizId}-${serial}`;
+    // Supabase receipts (async, so handled outside, but fallback to local for now)
+    // The async fetch in useEffect should update the next serial if needed
+    serial = Math.max(...allSerials, 0) + 1;
+    // Ensure uniqueness by checking all known serials
+    let nextSerial = serial;
+    let exists = allSerials.includes(nextSerial);
+    while (exists) {
+      nextSerial += 1;
+      exists = allSerials.includes(nextSerial);
+    }
+    return `GR-${bizId}-${nextSerial}`;
   }
 
   // Handle customer input (ID only, numeric)
@@ -357,14 +355,25 @@ export default function GenerateReceiptPage() {
   const addNewCustomer = async () => {
     setAddingCustomer(true);
     try {
+      // Save to Supabase
       const { data, error } = await supabase.from('customers').insert([newCustomer]);
       if (error) throw error;
       // Defensive: data may be null or not an array, so check type
-      const inserted = Array.isArray(data) ? data[0] : (data ? data : null);
+      const inserted: any = Array.isArray(data) ? data[0] : (data ? data : null);
       if (inserted) {
-        setCustomers(prev => [...prev, inserted]);
-        setCustomerId((inserted as any).customerId || (inserted as any).name);
+        setCustomers((prev: any[]) => [...prev, inserted]);
+        setCustomerId(inserted.customerId || inserted.name);
         setSelectedCustomer(inserted);
+        // Save to localStorage as well
+        const bizId = localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
+        if (bizId) {
+          let localCustomers: any[] = [];
+          try {
+            localCustomers = JSON.parse(localStorage.getItem(`customers_${bizId}`) || '[]');
+          } catch {}
+          localCustomers.push(inserted);
+          localStorage.setItem(`customers_${bizId}`, JSON.stringify(localCustomers));
+        }
       }
       setShowNewCustomer(false);
       setNewCustomer({
@@ -445,7 +454,7 @@ export default function GenerateReceiptPage() {
       setSaving(false);
       return;
     }
-    const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format.columns.gst ? (1 + p.gst/100) : 1), 0);
+    const total = products.reduce((sum, p) => sum + p.price * p.quantity * (format && format.columns && format.columns.gst ? (1 + p.gst/100) : 1), 0);
     // Generate a unique code for this receipt (for QR and DB lookup)
     const bizId = businessInfo?.businessId || (businessInfo as any)?.user_code || localStorage.getItem('businessId') || localStorage.getItem('user_code') || '';
     if (!bizId) {
@@ -617,10 +626,6 @@ export default function GenerateReceiptPage() {
                   <option key={f.name} value={f.name}>{f.name}</option>
                 ))}
               </select>
-            </div>
-            {/* Receipt Template Selection */}
-            <div className="mb-6">
-              <SelectReceiptTemplate selected={selectedTemplate} setSelected={setSelectedTemplate} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
