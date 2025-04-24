@@ -145,10 +145,13 @@ export default function ProductInventoryDashboard() {
     URL.revokeObjectURL(url);
   }
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredProducts = products.filter(p => {
+    if (!p || typeof p !== 'object') return false;
+    const name = (p.name || '').toString();
+    const sku = (p.sku || '').toString();
+    return name.toLowerCase().includes(search.toLowerCase()) ||
+      (sku && sku.toLowerCase().includes(search.toLowerCase()));
+  });
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">

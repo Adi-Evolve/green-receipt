@@ -100,7 +100,6 @@ export default function CustomerAnalyticsPage() {
                 <tr>
                   <th>Name</th>
                   <th>Phone</th>
-                  <th>Email</th>
                   <th>Remaining Amount</th>
                   <th>Actions</th>
                 </tr>
@@ -114,7 +113,6 @@ export default function CustomerAnalyticsPage() {
                     <tr key={customer.customerId || customer.id}>
                       <td>{customer.name}</td>
                       <td>{customer.phone}</td>
-                      <td>{customer.email}</td>
                       <td><span className="text-red-600 font-semibold">₹{totalDue.toFixed(2)}</span></td>
                       <td><button className="btn-secondary" onClick={() => handleSelectCustomer(customer)}>View Profile</button></td>
                     </tr>
