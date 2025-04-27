@@ -28,8 +28,17 @@ export default function AddCustomerPage() {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const bizId = localStorage.getItem('businessId') || '';
-    setBusinessId(bizId);
+    // --- Synchronize businessId and user_code everywhere ---
+    let user_code = localStorage.getItem('user_code');
+    let bizId = localStorage.getItem('businessId');
+    if (user_code && !bizId) {
+      localStorage.setItem('businessId', user_code);
+      bizId = user_code;
+    } else if (!user_code && bizId) {
+      localStorage.setItem('user_code', bizId);
+      user_code = bizId;
+    }
+    setBusinessId(bizId || '');
     // Load formats
     const arr = JSON.parse(localStorage.getItem(`customerFormats_${bizId}`) || '[]');
     setFormats(arr);
@@ -61,32 +70,83 @@ export default function AddCustomerPage() {
       setLoading(false);
       return;
     }
-    // Prepare customer payload
-    const customer = { ...form, format: chosenFormat?.name, user_code: businessId };
+    // Check for valid businessId (user_code)
+    if (!businessId) {
+      setError('Business profile not found. Please register your business first.');
+      setLoading(false);
+      return;
+    }
+    // --- FIX: Try both businessId and user_code from localStorage ---
+    let userCodeToCheck = businessId;
+    // If businessId not found in users, try user_code from localStorage
+    let userData = null;
+    let userError = null;
     try {
-      // Save to Supabase
-      const { error } = await supabase.from('customers').upsert([customer]);
-      if (error) {
-        setError('Failed to save to Supabase: ' + error.message);
+      // First try businessId
+      let res = await supabase
+        .from('users')
+        .select('user_code')
+        .eq('user_code', userCodeToCheck)
+        .maybeSingle();
+      userData = res.data;
+      userError = res.error;
+      // If not found, try user_code from localStorage
+      if (!userData) {
+        const altUserCode = localStorage.getItem('user_code');
+        if (altUserCode && altUserCode !== businessId) {
+          let altRes = await supabase
+            .from('users')
+            .select('user_code')
+            .eq('user_code', altUserCode)
+            .maybeSingle();
+          userData = altRes.data;
+          userError = altRes.error;
+          if (userData) {
+            userCodeToCheck = altUserCode;
+            setBusinessId(altUserCode); // update state for future saves
+          }
+        }
+      }
+      if (userError) {
+        setError('Error verifying business profile: ' + userError.message);
         setLoading(false);
         return;
       }
-      setSuccess(true);
-      setForm({ name: '' });
-      // Refresh local list from Supabase
-      const { data } = await supabase.from('customers').select('*').eq('user_code', businessId);
-      if (data) localStorage.setItem(`customers_${businessId}`, JSON.stringify(data));
-      // Also update localStorage directly (for instant cache)
-      let arr = [];
-      try { arr = JSON.parse(localStorage.getItem(`customers_${businessId}`) || '[]'); } catch {}
-      arr.push(customer);
-      localStorage.setItem(`customers_${businessId}`, JSON.stringify(arr));
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError('Unexpected error: ' + err.message);
-      } else {
-        setError('Unexpected error occurred.');
+      if (!userData) {
+        setError('Business profile not found. Please register your business first.');
+        setLoading(false);
+        return;
       }
+      // Prepare customer payload
+      const customer = { ...form, format: chosenFormat?.name, user_code: businessId };
+      try {
+        // Save to Supabase
+        const { error } = await supabase.from('customers').upsert([customer]);
+        if (error) {
+          setError('Failed to save to Supabase: ' + error.message);
+          setLoading(false);
+          return;
+        }
+        setSuccess(true);
+        setForm({ name: '' });
+        // Refresh local list from Supabase
+        const { data } = await supabase.from('customers').select('*').eq('user_code', businessId);
+        if (data) localStorage.setItem(`customers_${businessId}`, JSON.stringify(data));
+        // Also update localStorage directly (for instant cache)
+        let arr = [];
+        try { arr = JSON.parse(localStorage.getItem(`customers_${businessId}`) || '[]'); } catch {}
+        arr.push(customer);
+        localStorage.setItem(`customers_${businessId}`, JSON.stringify(arr));
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError('Unexpected error: ' + err.message);
+        } else {
+          setError('Unexpected error occurred.');
+        }
+      }
+    } catch (err: any) {
+      setError('Error saving customer: ' + err.message);
+      setLoading(false);
     }
     setLoading(false);
   };

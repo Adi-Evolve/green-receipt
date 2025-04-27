@@ -43,6 +43,18 @@ export default function SettingsPage() {
   useEffect(() => { setHasMounted(true); }, []);
 
   useEffect(() => {
+    // --- Synchronize businessId and user_code everywhere ---
+    let user_code = localStorage.getItem('user_code');
+    let businessId = localStorage.getItem('businessId');
+    if (user_code && !businessId) {
+      localStorage.setItem('businessId', user_code);
+      businessId = user_code;
+    } else if (!user_code && businessId) {
+      localStorage.setItem('user_code', businessId);
+      user_code = businessId;
+    }
+    setBusinessId(businessId || '');
+    setUserCode(user_code || '');
     if (!hasMounted) return;
     if (typeof window !== 'undefined') {
       const savedTemplate = localStorage.getItem('receipt_template');
@@ -51,10 +63,6 @@ export default function SettingsPage() {
       if (savedBusinessName) setBusinessName(savedBusinessName);
       const savedWebhookUrl = localStorage.getItem('webhook_url');
       if (savedWebhookUrl) setWebhookUrl(savedWebhookUrl);
-      const savedUserCode = localStorage.getItem('user_code');
-      if (savedUserCode) setUserCode(savedUserCode);
-      const savedBusinessId = localStorage.getItem('businessId');
-      if (savedBusinessId) setBusinessId(savedBusinessId);
       const savedTheme = localStorage.getItem('theme');
       if (savedTheme) setTheme(savedTheme);
       const savedColor = localStorage.getItem('colorTheme');

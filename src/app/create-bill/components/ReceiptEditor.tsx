@@ -122,7 +122,16 @@ const ReceiptEditor = () => {
   // Load product options from localStorage and then DB (deduplicated)
   useEffect(() => {
     async function fetchProducts() {
-      const user_code = typeof window !== 'undefined' ? localStorage.getItem('user_code') : '';
+      // --- Synchronize businessId and user_code everywhere ---
+      let user_code = localStorage.getItem('user_code');
+      let businessId = localStorage.getItem('businessId');
+      if (user_code && !businessId) {
+        localStorage.setItem('businessId', user_code);
+        businessId = user_code;
+      } else if (!user_code && businessId) {
+        localStorage.setItem('user_code', businessId);
+        user_code = businessId;
+      }
       let localProducts: Product[] = [];
       try {
         const localRaw = localStorage.getItem('products_' + user_code);

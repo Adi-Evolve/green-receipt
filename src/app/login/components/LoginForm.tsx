@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient'; // Make sure to import supabase correctly
 
 const LoginForm = () => {
   const router = useRouter();
@@ -64,6 +65,14 @@ const LoginForm = () => {
         userInfo = JSON.parse(businessInfoRaw);
       } else {
         userInfo = { email: formData.email, businessId: user_code || '', businessName: '' };
+      }
+      // --- Synchronize businessId and user_code everywhere ---
+      let businessId = localStorage.getItem('businessId');
+      if (user_code && !businessId) {
+        localStorage.setItem('businessId', user_code);
+        businessId = user_code;
+      } else if (!user_code && businessId) {
+        localStorage.setItem('user_code', businessId);
       }
       // Use consistent business info
       localStorage.setItem('userEmail', formData.email);

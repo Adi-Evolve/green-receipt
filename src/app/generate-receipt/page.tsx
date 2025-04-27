@@ -129,14 +129,24 @@ export default function GenerateReceiptPage() {
   }, []);
 
   useEffect(() => {
-    if (!hasMounted) return;
+    // --- Synchronize businessId and user_code everywhere ---
+    let user_code = localStorage.getItem('user_code');
+    let businessId = localStorage.getItem('businessId');
+    if (user_code && !businessId) {
+      localStorage.setItem('businessId', user_code);
+      businessId = user_code;
+    } else if (!user_code && businessId) {
+      localStorage.setItem('user_code', businessId);
+      user_code = businessId;
+    }
+    setBusinessInfo((prev: any) => ({ ...(prev || {}), businessId: businessId || '', user_code: user_code || '' }));
     let bizInfo: any = null;
     let bizId = '';
     const savedBiz = localStorage.getItem('businessInfo');
     if (savedBiz) {
       try {
         bizInfo = JSON.parse(savedBiz);
-        bizId = bizInfo.businessId || (bizInfo as any).user_code || '';
+        bizId = bizInfo.businessId || bizInfo.user_code || '';
       } catch {}
     }
     setBusinessInfo(bizInfo);

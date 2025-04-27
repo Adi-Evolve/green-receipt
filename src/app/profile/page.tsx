@@ -32,10 +32,23 @@ export default function ProfilePage() {
   const [editing, setEditing] = React.useState(false);
 
   React.useEffect(() => {
-    // Check for user_code in localStorage
-    const user_code = localStorage.getItem('user_code');
+    // --- Synchronize businessId and user_code everywhere ---
+    let user_code = localStorage.getItem('user_code');
+    let businessId = localStorage.getItem('businessId');
+    // If both are missing, redirect to registration
+    if (!user_code && !businessId) {
+      window.location.href = '/register';
+      return;
+    }
+    // If only one exists, set both to the same value
+    if (user_code && !businessId) {
+      localStorage.setItem('businessId', user_code);
+      businessId = user_code;
+    } else if (!user_code && businessId) {
+      localStorage.setItem('user_code', businessId);
+      user_code = businessId;
+    }
     if (!user_code) {
-      alert('User code not found. Please register first.');
       window.location.href = '/register';
       return;
     }
@@ -52,10 +65,10 @@ export default function ProfilePage() {
           gst: data.gst_number || '',
           email: data.email || '',
           phone: data.phone || '',
-          logoUrl: data.logo_url || '',
+          logoUrl: data.logo_url || '', // <-- Ensure logoUrl is set from Supabase
           terms: data.terms || '',
         }));
-        // Optionally update localStorage for later fast loads
+        // --- Always update businessInfo with correct businessId ---
         localStorage.setItem('businessInfo', JSON.stringify({
           businessName: data.name || '',
           businessId: data.user_code || '',
@@ -63,13 +76,40 @@ export default function ProfilePage() {
           gst: data.gst_number || '',
           email: data.email || '',
           phone: data.phone || '',
-          logoUrl: data.logo_url || '',
+          logoUrl: data.logo_url || '', // <-- Ensure logoUrl is set from Supabase
           terms: data.terms || '',
         }));
+        // --- Synchronize both keys again after successful fetch ---
+        localStorage.setItem('user_code', data.user_code);
+        localStorage.setItem('businessId', data.user_code);
+      } else if (error) {
+        // If fetch fails, clear businessInfo to avoid showing stale data
+        localStorage.removeItem('businessInfo');
+        setForm(prev => ({ ...prev, businessId: '', businessName: '', address: '', gst: '', email: '', phone: '', logoUrl: '', terms: '' }));
       }
       setLoading(false);
     })();
   }, []);
+
+  // When editing, if businessId is empty, auto-generate one
+  React.useEffect(() => {
+    if (editing && !form.businessId) {
+      const newId = generateBusinessId();
+      setForm(prev => ({ ...prev, businessId: newId }));
+      localStorage.setItem('businessId', newId);
+      localStorage.setItem('user_code', newId);
+    }
+  }, [editing, form.businessId]);
+
+  // When mounting for new profile (no businessInfo, not editing), auto-generate businessId
+  React.useEffect(() => {
+    if (!localStorage.getItem('businessInfo') && !editing && !form.businessId) {
+      const newId = generateBusinessId();
+      setForm(prev => ({ ...prev, businessId: newId }));
+      localStorage.setItem('businessId', newId);
+      localStorage.setItem('user_code', newId);
+    }
+  }, [editing, form.businessId]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
@@ -113,10 +153,31 @@ export default function ProfilePage() {
         localStorage.setItem('logoUrl', logoUrl); // Cache logo URL in localStorage
       }
       // Save/update user profile in Supabase 'users' table (user-centric)
-      const user_code = localStorage.getItem('user_code');
+      let user_code = localStorage.getItem('user_code');
+      let businessId = form.businessId || user_code;
+      if (!businessId) {
+        businessId = generateBusinessId();
+        setForm(prev => ({ ...prev, businessId: businessId ?? '' })); // always string
+        localStorage.setItem('user_code', businessId);
+        localStorage.setItem('businessId', businessId);
+        user_code = businessId;
+      }
       if (!user_code) throw new Error('User code not found. Please register again.');
+      // --- Check if email already exists (other than this user_code) ---
+      const { data: existing, error: emailCheckError } = await supabase
+        .from('users')
+        .select('user_code')
+        .eq('email', form.email);
+      // Debug: Show all colliding user_codes
+      if (Array.isArray(existing) && existing.length > 0 && existing.some((row: { user_code?: string }) => row.user_code && row.user_code !== businessId)) {
+        const ids = existing.filter((row: { user_code?: string }) => row.user_code && row.user_code !== businessId).map((row: { user_code: string }) => row.user_code);
+        throw new Error(`This email is already registered to another profile (user_code(s): ${ids.join(", ")}). Please use a different email or contact support to recover your account.`);
+      }
+      if (!Array.isArray(existing) && existing && (existing as { user_code?: string }).user_code && (existing as { user_code?: string }).user_code !== businessId) {
+        throw new Error(`This email is already registered to another profile (user_code: ${(existing as { user_code: string }).user_code}). Please use a different email or contact support to recover your account.`);
+      }
       const userPayload = {
-        user_code,
+        user_code: businessId,
         name: form.businessName,
         email: form.email,
         phone: form.phone,
@@ -129,7 +190,7 @@ export default function ProfilePage() {
       const { error } = await supabase.from('users').upsert([userPayload], { onConflict: 'user_code' });
       if (error) throw error;
       // Save to localStorage for fast UX
-      localStorage.setItem('businessInfo', JSON.stringify({ ...form, logoUrl, user_code }));
+      localStorage.setItem('businessInfo', JSON.stringify({ ...form, logoUrl, businessId, user_code: businessId }));
       setShowSummary(true);
       setEditing(false);
     } catch (err: any) {
@@ -137,6 +198,39 @@ export default function ProfilePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // --- Delete profile logic ---
+  async function handleDeleteProfile() {
+    if (!window.confirm('Are you sure you want to delete your profile? This action cannot be undone.')) return;
+    const user_code = localStorage.getItem('user_code');
+    if (user_code) {
+      await supabase.from('users').delete().eq('user_code', user_code);
+      // Wait and check if deletion succeeded
+      let tries = 0;
+      let stillExists = true;
+      while (tries < 5 && stillExists) {
+        const { data: check, error } = await supabase.from('users').select('user_code').eq('user_code', user_code);
+        if (!check || check.length === 0) {
+          stillExists = false;
+        } else {
+          await new Promise(res => setTimeout(res, 500));
+          tries++;
+        }
+      }
+      if (stillExists) {
+        alert('Profile deletion failed. Please try again or contact support.');
+        return;
+      }
+    }
+    // Remove all business-related data from localStorage
+    localStorage.removeItem('user_code');
+    localStorage.removeItem('businessId');
+    localStorage.removeItem('businessInfo');
+    localStorage.removeItem('logoUrl');
+    // Optionally clear all app data (uncomment to fully reset)
+    // localStorage.clear();
+    window.location.href = '/register'; // Redirect to registration after deletion
   }
 
   // --- Backup/Import logic ---
@@ -245,6 +339,13 @@ export default function ProfilePage() {
                   <div className="text-gray-900 whitespace-pre-line">{businessInfo.terms}</div>
                 </div>
               </div>
+              <button
+                type="button"
+                className="mt-6 px-6 py-2 rounded bg-red-600 text-white font-semibold shadow hover:bg-red-700 transition"
+                onClick={handleDeleteProfile}
+              >
+                Delete Profile
+              </button>
             </div>
             <div className="flex flex-col items-center gap-4 min-w-[120px]">
               <button className="btn-primary w-full" onClick={() => setEditing(true)}>
