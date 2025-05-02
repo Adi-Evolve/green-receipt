@@ -401,20 +401,29 @@ export default function GenerateReceiptPage() {
   };
 
   // Product autofill: Suggestion dropdown and autofill fields
+  const productSuggestionTimeouts: { [key: number]: NodeJS.Timeout } = {};
   const handleProductNameChange = (idx: number, value: string) => {
     const updated = [...products];
     updated[idx].name = value;
     setProducts(updated);
-    // Show suggestions for product name, dedupe by SKU or name
-    if (value.length > 0) {
-      const seen = new Set();
-      const suggestions = inventory.filter((prod: any) => {
-        const key = (prod.sku || prod.id || prod.name)?.toLowerCase();
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return (prod.productName || prod.name)?.toLowerCase().includes(value.toLowerCase());
-      });
-      setProductSuggestions(suggestions);
+    // Fetch suggestions from localStorage only (debounced, per-row)
+    let user_code = '';
+    if (typeof window !== 'undefined') {
+      user_code = localStorage.getItem('user_code') || '';
+    }
+    if (value.length > 0 && user_code) {
+      if (productSuggestionTimeouts[idx]) clearTimeout(productSuggestionTimeouts[idx]);
+      productSuggestionTimeouts[idx] = setTimeout(() => {
+        let localProducts = [];
+        try {
+          localProducts = JSON.parse(localStorage.getItem(`products_${user_code}`) || '[]');
+        } catch {}
+        const suggestions = localProducts.filter((prod: any) => {
+          const name = (prod.productName || prod.name || '').toLowerCase();
+          return name.includes(value.toLowerCase());
+        });
+        setProductSuggestions(suggestions);
+      }, 300);
     } else {
       setProductSuggestions([]);
     }
@@ -796,7 +805,7 @@ export default function GenerateReceiptPage() {
                         />
                         {productSuggestions.length > 0 && (
                           <ul className="absolute bg-white border border-gray-300 rounded shadow z-10 w-full max-h-32 overflow-y-auto">
-                            {productSuggestions.map((prod, i) => (
+                            {productSuggestions.map((prod: any, i) => (
                               <li
                                 key={prod.id || i}
                                 className="px-2 py-1 hover:bg-primary-100 cursor-pointer"

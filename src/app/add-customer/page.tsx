@@ -60,6 +60,14 @@ export default function AddCustomerPage() {
     setStep(2);
   };
 
+  // Handler to start creating a new format
+  const handleCreateNewFormat = () => {
+    setFormatName('');
+    setSelectedFields(['name']);
+    setStep(1); // Go back to format creation step
+    setError(null);
+  };
+
   // Save customer
   const saveCustomer = async () => {
     setLoading(true);
@@ -244,6 +252,16 @@ export default function AddCustomerPage() {
                   {success && <div className="text-green-600 mt-2">Customer added!</div>}
                   {error && <div className="text-red-600 mt-2">{error}</div>}
                 </form>
+              )}
+              {/* If formats exist, show 'Create New Format' button after first format creation */}
+              {formats.length > 0 && (
+                <button
+                  type="button"
+                  className="mt-2 btn-secondary"
+                  onClick={handleCreateNewFormat}
+                >
+                  + Create New Format
+                </button>
               )}
             </div>
           )}

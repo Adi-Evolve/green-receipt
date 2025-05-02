@@ -31,6 +31,15 @@ export default function ProfilePage() {
   const [showSummary, setShowSummary] = React.useState(false);
   const [editing, setEditing] = React.useState(false);
 
+  // --- Registration Redirect Logic ---
+  React.useEffect(() => {
+    const user_code = typeof window !== 'undefined' ? localStorage.getItem('user_code') : null;
+    if (!user_code) {
+      // No account exists, redirect to registration
+      window.location.href = '/register';
+    }
+  }, []);
+
   React.useEffect(() => {
     // --- Synchronize businessId and user_code everywhere ---
     let user_code = localStorage.getItem('user_code');

@@ -32,6 +32,7 @@ export default function CustomerAnalytics({ receipts }: { receipts: any[] }) {
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showProfile, setShowProfile] = useState(false);
   // Fetch customers from Supabase and localStorage
   useEffect(() => {
     async function fetchCustomers() {
@@ -90,6 +91,8 @@ export default function CustomerAnalytics({ receipts }: { receipts: any[] }) {
     );
   }, [selectedCustomer, allCustomers, receipts]);
 
+  const selectedCustomerObj = allCustomers.find(c => c.id === selectedCustomer || c.email === selectedCustomer || c.phone === selectedCustomer);
+
   const productStats = getProductStats(selectedReceipts);
   const totalRemaining = selectedReceipts.reduce((sum, r) => sum + (r.amount_remaining || 0), 0);
   const totalSpent = selectedReceipts.reduce((sum, r) => sum + (r.amount_paid || 0), 0);
@@ -114,41 +117,111 @@ export default function CustomerAnalytics({ receipts }: { receipts: any[] }) {
         {loading ? (
           <div className="text-center py-4">Loading customers...</div>
         ) : (
-          <ul className="max-h-48 overflow-y-auto border rounded mb-4">
-            {filteredCustomers.map((c, i) => (
-              <li
-                key={c.id || c.email || c.phone || i}
-                className={`px-4 py-2 cursor-pointer hover:bg-primary-50 ${selectedCustomer === (c.id || c.email || c.phone) ? 'bg-primary-100' : ''}`}
-                onClick={() => setSelectedCustomer(c.id || c.email || c.phone)}
-              >
-                <div className="font-semibold">{c.name || c.email || c.phone || 'Unnamed'}</div>
-                <div className="text-xs text-gray-600">{c.email || ''} {c.phone ? `| ${c.phone}` : ''}</div>
-              </li>
-            ))}
-            {filteredCustomers.length === 0 && <li className="px-4 py-2 text-gray-500">No customers found.</li>}
-          </ul>
+          <div className="overflow-x-auto mb-4">
+            <table className="min-w-full bg-white rounded shadow">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 border">Name</th>
+                  <th className="px-4 py-2 border">Email</th>
+                  <th className="px-4 py-2 border">Phone</th>
+                  <th className="px-4 py-2 border">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((c, i) => (
+                  <tr
+                    key={c.id || c.email || c.phone || i}
+                    className={`cursor-pointer hover:bg-primary-50 ${selectedCustomer === (c.id || c.email || c.phone) ? 'bg-primary-100' : ''}`}
+                    onClick={() => setSelectedCustomer(c.id || c.email || c.phone)}
+                  >
+                    <td className="px-4 py-2 border font-semibold">{c.name || 'Unnamed'}</td>
+                    <td className="px-4 py-2 border">{c.email || '-'}</td>
+                    <td className="px-4 py-2 border">{c.phone || '-'}</td>
+                    <td className="px-4 py-2 border">
+                      <button
+                        className="bg-primary-500 text-white px-3 py-1 rounded"
+                        onClick={e => { e.stopPropagation(); setSelectedCustomer(c.id || c.email || c.phone); setShowProfile(true); }}
+                      >
+                        View Profile
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredCustomers.length === 0 && (
+                  <tr><td colSpan={4} className="text-center text-gray-500 py-4">No customers found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
       {selectedCustomer && (
         <>
           {/* Customer Summary Section */}
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 rounded p-4">
-            <div><span className="font-semibold">Total Spent:</span> ₹{totalSpent.toLocaleString('en-IN')}</div>
-            <div><span className="font-semibold">Total Remaining:</span> ₹{totalRemaining.toLocaleString('en-IN')}</div>
-            <div><span className="font-semibold">First Purchase:</span> {firstPurchase}</div>
-            <div><span className="font-semibold">Last Purchase:</span> {lastPurchase}</div>
-            <div><span className="font-semibold">Most Frequent Product:</span> {mostFrequentProduct}</div>
-            <div><span className="font-semibold">Average Bill Value:</span> ₹{avgBillValue}</div>
+          <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 rounded p-4 flex-1">
+              <div><span className="font-semibold">Total Spent:</span> ₹{totalSpent.toLocaleString('en-IN')}</div>
+              <div><span className="font-semibold">Total Remaining:</span> ₹{totalRemaining.toLocaleString('en-IN')}</div>
+              <div><span className="font-semibold">First Purchase:</span> {firstPurchase}</div>
+              <div><span className="font-semibold">Last Purchase:</span> {lastPurchase}</div>
+              <div><span className="font-semibold">Most Frequent Product:</span> {mostFrequentProduct}</div>
+              <div><span className="font-semibold">Average Bill Value:</span> ₹{avgBillValue}</div>
+            </div>
+            <button
+              className="bg-primary-500 text-white px-4 py-2 rounded ml-0 md:ml-4 mt-4 md:mt-0"
+              onClick={() => setShowProfile(true)}
+            >
+              View Profile
+            </button>
           </div>
+          {/* Customer Profile Modal */}
+          {showProfile && selectedCustomerObj && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+              <div className="bg-white rounded-lg shadow-lg p-6 min-w-[320px] max-w-[90vw] relative">
+                <button className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" onClick={() => setShowProfile(false)}>&times;</button>
+                <h3 className="text-lg font-bold mb-4">Customer Profile</h3>
+                <div className="space-y-2">
+                  {selectedCustomerObj.name && <div><span className="font-semibold">Name:</span> {selectedCustomerObj.name}</div>}
+                  {selectedCustomerObj.email && <div><span className="font-semibold">Email:</span> {selectedCustomerObj.email}</div>}
+                  {selectedCustomerObj.phone && <div><span className="font-semibold">Phone:</span> {selectedCustomerObj.phone}</div>}
+                  {selectedCustomerObj.address && <div><span className="font-semibold">Address:</span> {selectedCustomerObj.address}</div>}
+                  {selectedCustomerObj.city && <div><span className="font-semibold">City:</span> {selectedCustomerObj.city}</div>}
+                  {selectedCustomerObj.state && <div><span className="font-semibold">State:</span> {selectedCustomerObj.state}</div>}
+                  {selectedCustomerObj.pincode && <div><span className="font-semibold">Pincode:</span> {selectedCustomerObj.pincode}</div>}
+                  {/* Add more fields as needed, but only show if present */}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="mb-4">
             <h4 className="font-semibold mb-2">All Bills Issued</h4>
-            <ul className="list-disc ml-6">
-              {selectedReceipts.map((r, i) => (
-                <li key={r.id || r.receipt_id || i}>
-                  Receipt #{r.receipt_number || r.id} | Date: {r.date} | Total: ₹{r.total} | Paid: ₹{r.amount_paid || 0} | Remaining: ₹{r.amount_remaining || 0}
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white rounded shadow">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-2 border">Receipt #</th>
+                    <th className="px-4 py-2 border">Date</th>
+                    <th className="px-4 py-2 border">Total</th>
+                    <th className="px-4 py-2 border">Paid</th>
+                    <th className="px-4 py-2 border">Remaining</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedReceipts.map((r, i) => (
+                    <tr key={r.id || r.receipt_id || i} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 border">{r.receipt_number || r.id}</td>
+                      <td className="px-4 py-2 border">{r.date}</td>
+                      <td className="px-4 py-2 border">₹{r.total}</td>
+                      <td className="px-4 py-2 border">₹{r.amount_paid || 0}</td>
+                      <td className="px-4 py-2 border">₹{r.amount_remaining || 0}</td>
+                    </tr>
+                  ))}
+                  {selectedReceipts.length === 0 && (
+                    <tr><td colSpan={5} className="text-center text-gray-500 py-4">No receipts found for this customer.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
           <div className="mb-4">
             <h4 className="font-semibold mb-2">Products Purchased (Quantity)</h4>

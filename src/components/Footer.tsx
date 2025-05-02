@@ -84,6 +84,11 @@ const Footer = () => {
         </div>
         
         <div className="mt-8 pt-8 border-t border-gray-600">
+          <div className="mb-2 text-sm text-center">
+            <span className="block">Owner: DON</span>
+            <span className="block">Company Name: Don Agency</span>
+            <span className="block">Phone: 8857053541</span>
+          </div>
           <p className="text-gray-300 text-sm text-center">
             &copy; {currentYear} Green Receipt. All rights reserved.
           </p>

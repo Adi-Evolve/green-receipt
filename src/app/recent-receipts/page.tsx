@@ -148,7 +148,7 @@ export default function RecentReceiptsPage() {
               {sortOrder === 'asc' ? '↑' : '↓'}
             </button>
           </div>
-          <Link href="/analytics" className="btn-primary">View Analytics</Link>
+          {/* View Analytics button removed as per user request */}
         </div>
         <div className="bg-white rounded shadow p-6">
           {loading ? (

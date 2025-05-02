@@ -119,6 +119,116 @@ const ReceiptEditor = () => {
 
   const router = useRouter();
 
+  // --- Bill Designer Additions ---
+  const RECEIPT_TYPES = [
+    { label: 'POS (Thermal)', value: 'pos' },
+    { label: 'A4 Invoice', value: 'a4' },
+    { label: 'Custom Size', value: 'custom' },
+    { label: 'Compact', value: 'compact' },
+    { label: 'Estimate/Quotation', value: 'estimate' }
+  ];
+  const LAYOUTS = [
+    { label: 'Standard', value: 'standard' },
+    { label: 'Compact', value: 'compact' },
+    { label: 'Detailed', value: 'detailed' },
+    { label: 'Minimal', value: 'minimal' }
+  ];
+  const FONTS = ['Arial', 'Roboto', 'Courier New', 'Georgia', 'Times New Roman', 'Monospace'];
+  const COLORS = [
+    { name: 'Default', value: '#1a202c' },
+    { name: 'Blue', value: '#2563eb' },
+    { name: 'Green', value: '#059669' },
+    { name: 'Red', value: '#dc2626' },
+    { name: 'Gray', value: '#6b7280' }
+  ];
+
+  // --- Bill Designer State ---
+  const [receiptType, setReceiptType] = useState('pos');
+  const [layout, setLayout] = useState('standard');
+  const [font, setFont] = useState('Arial');
+  const [color, setColor] = useState('#1a202c');
+  const [customWidth, setCustomWidth] = useState(210); // mm for custom
+  const [customHeight, setCustomHeight] = useState(297); // mm for custom
+
+  // --- Bill Designer Controls UI ---
+  const renderDesignerControls = () => (
+    <div className="p-4 bg-white rounded shadow mb-6 flex flex-wrap gap-6 items-center">
+      {/* Receipt Type */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Receipt Type</label>
+        <select value={receiptType} onChange={e => setReceiptType(e.target.value)} className="input-field">
+          {RECEIPT_TYPES.map(rt => <option key={rt.value} value={rt.value}>{rt.label}</option>)}
+        </select>
+      </div>
+      {/* Layout */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Layout</label>
+        <select value={layout} onChange={e => setLayout(e.target.value)} className="input-field">
+          {LAYOUTS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+        </select>
+      </div>
+      {/* Font */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Font</label>
+        <select value={font} onChange={e => setFont(e.target.value)} className="input-field">
+          {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+      </div>
+      {/* Color Theme */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Theme Color</label>
+        <select value={color} onChange={e => setColor(e.target.value)} className="input-field">
+          {COLORS.map(c => <option key={c.value} value={c.value}>{c.name}</option>)}
+        </select>
+      </div>
+      {/* Custom Size for Custom Type */}
+      {receiptType === 'custom' && (
+        <div className="flex gap-2 items-end">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Width (mm)</label>
+            <input type="number" value={customWidth} onChange={e => setCustomWidth(Number(e.target.value))} className="input-field w-20" min={50} max={300} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Height (mm)</label>
+            <input type="number" value={customHeight} onChange={e => setCustomHeight(Number(e.target.value))} className="input-field w-20" min={50} max={400} />
+          </div>
+        </div>
+      )}
+      {/* Column Controls */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Columns</label>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(columns).map(([col, enabled]) => (
+            <label key={col} className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={() => setColumns(c => ({ ...c, [col]: !c[col as keyof typeof c] }))}
+              />
+              <span className="capitalize">{col}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      {/* Elements Controls */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Show/Hide Sections</label>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(elements).map(([el, enabled]) => (
+            <label key={el} className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={() => setElements(e => ({ ...e, [el]: !e[el as keyof typeof e] }))}
+              />
+              <span className="capitalize">{el.replace(/([A-Z])/g, ' $1')}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   // Load product options from localStorage and then DB (deduplicated)
   useEffect(() => {
     async function fetchProducts() {
@@ -348,6 +458,7 @@ const ReceiptEditor = () => {
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
+      {renderDesignerControls()}
       {!showPreview ? (
         <div className="p-6">
           <div className="flex justify-between mb-4">
@@ -671,11 +782,26 @@ const ReceiptEditor = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <input
                             type="text"
+                            list={`product-list-${index}`}
                             value={product.name}
-                            onChange={(e) => handleProductChange(index, 'name', e.target.value)}
+                            onChange={e => {
+                              const selected = productOptions.find(opt => opt.name === e.target.value);
+                              if (selected) {
+                                handleProductChange(index, 'name', selected.name);
+                                handleProductChange(index, 'price', selected.price);
+                                handleProductChange(index, 'gst', selected.gst);
+                              } else {
+                                handleProductChange(index, 'name', e.target.value);
+                              }
+                            }}
                             className="border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm"
-                            placeholder="Enter product name"
+                            placeholder="Enter or select product name"
                           />
+                          <datalist id={`product-list-${index}`}>
+                            {productOptions.map(opt => (
+                              <option key={opt.id} value={opt.name} />
+                            ))}
+                          </datalist>
                         </td>
                       )}
                       {columns.quantity && (
@@ -842,7 +968,27 @@ const ReceiptEditor = () => {
           )}
         </div>
       ) : (
-        <div>
+        <div
+          className={showPreview ? "bg-white shadow rounded-lg p-6" : ""}
+          style={{
+            fontFamily: font,
+            color: color,
+            maxWidth:
+              receiptType === 'a4' ? 900 :
+              receiptType === 'pos' ? 380 :
+              receiptType === 'compact' ? 300 :
+              receiptType === 'custom' ? customWidth * 3.78 : 700,
+            minHeight:
+              receiptType === 'a4' ? 1200 :
+              receiptType === 'pos' ? 600 :
+              receiptType === 'compact' ? 400 :
+              receiptType === 'custom' ? customHeight * 3.78 : 600,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            margin: '0 auto',
+            transition: 'all 0.3s',
+          }}
+        >
           <ReceiptPreview 
             receipt={receipt} 
             elements={elements} 

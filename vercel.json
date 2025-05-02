@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/view-receipt/:id", "destination": "/view-receipt/[id]" },
+    { "source": "/recent-receipts/:id", "destination": "/recent-receipts/[id]" },
+    { "source": "/receipts/:id", "destination": "/receipts/[id]" },
+    { "source": "/dashboard/(.*)", "destination": "/dashboard/$1" },
+    { "source": "/(.*)", "destination": "/$1" }
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "static": {
+    "public": "public"
+  }
+}
