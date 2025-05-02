@@ -24,4 +24,4 @@ export async function generateStaticParams() {
   }
   // Fallback: return empty array (no static pages generated)
   return [];
-}
+} 
