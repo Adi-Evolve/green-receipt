@@ -312,7 +312,7 @@ export default function CustomerAnalyticsPage() {
               ))}
               {/* Show recent receipts if editing an existing customer */}
               {editingCustomer && (
-                <CustomerReceiptsSection customerId={editingCustomer.customerId || editingCustomer.id} businessId={businessId} />
+                <CustomerReceiptsSection customerId={(editingCustomer.customerId || editingCustomer.id) ?? ''} businessId={businessId} />
               )}
               <div className="flex justify-end gap-2 mt-4">
                 <button type="button" className="btn-secondary" onClick={() => { setShowDialog(false); setEditingCustomer(null); setForm({}); }}>Cancel</button>
