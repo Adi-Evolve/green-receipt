@@ -29,6 +29,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js'); }` }} />
       </Head>
       <body>
+        {/* Show a PWA install prompt for desktop users */}
+        {typeof window !== 'undefined' && process.env.NODE_ENV !== 'development' && (
+          require('../components/PWAPrompt').default()
+        )}
         <ClientLayout>
           {children}
         </ClientLayout>
