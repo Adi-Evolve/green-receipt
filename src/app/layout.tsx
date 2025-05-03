@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import ClientLayout from './ClientLayout';
 import Head from 'next/head';
+import dynamic from 'next/dynamic';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -10,6 +11,8 @@ export const metadata: Metadata = {
   title: 'Green Receipt - Digital Billing Solution',
   description: 'Eco-friendly digital receipts platform for businesses',
 };
+
+const PwaInstallPrompt = dynamic(() => import('../components/PwaInstallPrompt'), { ssr: false });
 
 export default function RootLayout({
   children,
@@ -29,13 +32,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js'); }` }} />
       </Head>
       <body>
-        {/* Show a PWA install prompt for desktop users */}
-        {typeof window !== 'undefined' && process.env.NODE_ENV !== 'development' && (
-          require('../components/PWAPrompt').default()
-        )}
         <ClientLayout>
           {children}
         </ClientLayout>
+        <PwaInstallPrompt />
       </body>
     </html>
   );
