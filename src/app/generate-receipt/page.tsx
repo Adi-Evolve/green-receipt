@@ -495,9 +495,11 @@ export default function GenerateReceiptPage() {
       }
     }
     const receiptData = {
+      // Add customer_name to save customer name in the correct column
       user_code: bizId,
       receipt_number: receiptNumber,
       customer_id: customerId,
+      customer_name: selectedCustomer?.name || '',
       products: JSON.stringify(products),
       total,
       date,
@@ -513,7 +515,7 @@ export default function GenerateReceiptPage() {
       amount_remaining: amountRemaining,
     };
     try {
-      const { error } = await supabase.from('receipts').insert([receiptData]);
+      const { error } = await supabase.from('receipts').insert([receiptData]); // customer_name and customer_id now mapped correctly
       setSaving(false);
       if (error) setSaveError('Failed to save receipt: ' + error.message);
       else {
