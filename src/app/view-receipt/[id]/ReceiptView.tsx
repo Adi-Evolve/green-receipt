@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from '@/lib/supabaseClient';
 import { RECEIPT_TEMPLATES } from '../../components/ReceiptTemplates';
+import QRCode from 'react-qr-code';
 
 export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?: any, id?: string }) {
   const [receipt, setReceipt] = useState<any>(initialReceipt || null);
@@ -168,6 +169,13 @@ export default function ReceiptView({ receipt: initialReceipt, id }: { receipt?:
           }
           return receipt.totalAmount || receipt.total || '-';
         })()}</div>
+      </div>
+
+      {/* QR Code for direct receipt view */}
+      <div className="flex flex-col items-center mt-6">
+        <div className="mb-2 text-sm text-gray-600">Scan to view this receipt online:</div>
+        <QRCode value={qrValue} size={110} />
+        <div className="mt-1 text-xs text-gray-400 break-all">{qrValue}</div>
       </div>
 
       {/* Download PDF Button */}
